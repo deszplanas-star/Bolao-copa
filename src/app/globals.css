@@ -1,0 +1,20 @@
+@import url("https://fonts.googleapis.com/css2?family=Anton&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  ::selection {
+    background: theme('colors.yellow');
+    color: theme('colors.ink');
+  }
+}
+
+@layer components {
+  .display { @apply font-anton uppercase tracking-tight leading-none; }
+}
