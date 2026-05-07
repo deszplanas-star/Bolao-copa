@@ -1,48 +1,71 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import type { Group, Match, MatchView, Prediction, Team } from "@/lib/types";
+import ApostasClient from "./ApostasClient";
+
+export const dynamic = "force-dynamic";
 
 export default async function ApostasPage() {
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) redirect("/login?next=/apostas");
 
+  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes] = await Promise.all([
+    supabase.from("groups").select("*").order("ord", { ascending: true }),
+    supabase.from("teams").select("*"),
+    supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
+    supabase
+      .from("predictions")
+      .select("id,user_id,match_id,home_score,away_score,points,computed_at")
+      .eq("user_id", user.id),
+    supabase
+      .from("payments")
+      .select("status")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  const groups = (groupsRes.data ?? []) as Group[];
+  const teams = (teamsRes.data ?? []) as Team[];
+  const matches = (matchesRes.data ?? []) as Match[];
+  const preds = (predsRes.data ?? []) as Prediction[];
+  const paymentStatus =
+    (paymentRes.data?.status as "pending" | "approved" | "denied" | undefined) ?? null;
+
+  const teamById = new Map(teams.map((t) => [t.id, t]));
+  const predByMatch = new Map(preds.map((p) => [p.match_id, p]));
+
+  const matchViews: MatchView[] = matches
+    .map((m) => {
+      const home = teamById.get(m.home_team_id);
+      const away = teamById.get(m.away_team_id);
+      if (!home || !away) return null;
+      const p = predByMatch.get(m.id);
+      return {
+        ...m,
+        home,
+        away,
+        prediction: p ? { home_score: p.home_score, away_score: p.away_score } : null,
+      } satisfies MatchView;
+    })
+    .filter((m): m is MatchView => m !== null);
+
   return (
-    <main className="min-h-screen bg-paper">
-      <header className="bg-ink text-paper border-b-4 border-green">
-        <div className="max-w-[1280px] mx-auto px-8 h-14 flex items-center justify-between gap-6">
-          <div className="flex items-center gap-2 font-anton uppercase tracking-wider">
-            <span className="w-2 h-2 bg-green rounded-full animate-pulse" />
-            Bolão / 26
-          </div>
-          <div className="hidden md:block font-mono text-[11px] uppercase tracking-widest text-paper3">
-            bolaocopa26.com / apostas / <span className="text-yellow">grupo-c</span>
-          </div>
-          <div className="font-mono text-[11px] uppercase tracking-widest text-green">
-            {user.user_metadata?.full_name || user.email}
-          </div>
-        </div>
-      </header>
-
-      <section className="max-w-[1280px] mx-auto px-8 py-16">
-        <div className="border-b-[3px] border-ink pb-3 mb-8 relative">
-          <h1 className="font-anton text-5xl uppercase tracking-tight text-green">
-            <span className="text-ink">►</span> Minhas Apostas
-          </h1>
-          <span className="absolute -bottom-2 left-0 w-20 h-0.5 bg-green" />
-        </div>
-
-        <div className="p-12 border-2 border-dashed border-rule bg-paper2 text-center">
-          <h2 className="font-anton text-3xl uppercase text-ink mb-3">
-            Em construção
-          </h2>
-          <p className="font-serif italic text-soft max-w-prose mx-auto">
-            Logado como <strong className="text-ink">{user.email}</strong>. A área de palpites por jogo está sendo migrada do mockup HTML para esta versão React. Em breve com 72 jogos, classificação ao vivo, salvamento no Supabase e Pix integrado.
-          </p>
-        </div>
-      </section>
-    </main>
+    <ApostasClient
+      user={{
+        email: user.email ?? "",
+        name:
+          (user.user_metadata?.full_name as string | undefined) ??
+          (user.user_metadata?.name as string | undefined) ??
+          user.email ??
+          "",
+      }}
+      groups={groups}
+      teams={teams}
+      matches={matchViews}
+      paymentStatus={paymentStatus}
+    />
   );
 }
