@@ -68,6 +68,7 @@ export default function ApostasClient({
   rankings,
   currentUserId,
 }: Props) {
+  const sealed = paymentStatus === "pending" || paymentStatus === "approved";
   const [tab, setTab] = useState<TabKey>("apostas");
   const initialGroup = groups[0]?.code ?? "A";
   const [currentGroup, setCurrentGroup] = useState<string>(initialGroup);
@@ -360,6 +361,34 @@ export default function ApostasClient({
 
       {/* CONTEÚDO */}
       <main className="flex-1 pb-32">
+        {tab === "apostas" && sealed && (
+          <div className="max-w-[1280px] mx-auto px-8 pt-6">
+            <div
+              className={[
+                "border-l-4 px-5 py-4 flex items-center gap-3",
+                paymentStatus === "approved"
+                  ? "border-green bg-green/10"
+                  : "border-yellow bg-yellow/10",
+              ].join(" ")}
+            >
+              <span className="font-anton text-2xl">
+                {paymentStatus === "approved" ? "✓" : "⏳"}
+              </span>
+              <div className="flex-1">
+                <div className="font-anton uppercase tracking-wider text-sm text-ink">
+                  {paymentStatus === "approved"
+                    ? "Aposta ativa · palpites travados"
+                    : "Pix enviado · palpites travados"}
+                </div>
+                <div className="font-serif italic text-xs text-soft mt-0.5">
+                  {paymentStatus === "approved"
+                    ? "Seus 72 palpites estão selados. Boa sorte na Copa."
+                    : "Aguardando aprovação do admin. Edição liberada se o Pix for negado."}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {tab === "apostas" && (
           <div className="max-w-[1280px] mx-auto px-8 py-8 grid lg:grid-cols-[1fr_360px] gap-8">
             {/* Matches pane */}
@@ -371,6 +400,7 @@ export default function ApostasClient({
                   draft={drafts[m.id]}
                   index={idx}
                   now={now}
+                  sealed={sealed}
                   onChange={updateScore}
                 />
               ))}
@@ -606,12 +636,14 @@ function MatchRow({
   draft,
   index,
   now,
+  sealed,
   onChange,
 }: {
   match: MatchView;
   draft: Draft | undefined;
   index: number;
   now: number;
+  sealed: boolean;
   onChange: (matchId: string, side: "home" | "away", val: string) => void;
 }) {
   const home = draft?.home ?? "";
@@ -619,13 +651,18 @@ function MatchRow({
   const filled = parseScore(home) !== null && parseScore(away) !== null;
 
   const locked =
+    sealed ||
     match.status !== "scheduled" ||
     new Date(match.kickoff_at).getTime() - now <= 5 * 60 * 1000;
 
   const countdown = !locked ? fmtCountdown(match.kickoff_at) : null;
   const showCountdown = countdown && new Date(match.kickoff_at).getTime() - now < 24 * 3600 * 1000;
 
-  const status = locked ? (
+  const status = sealed ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-green">
+      aposta selada
+    </span>
+  ) : locked ? (
     <span className="font-mono text-[10px] uppercase tracking-widest text-red-600">
       apostas fechadas
     </span>

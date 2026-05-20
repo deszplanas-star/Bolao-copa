@@ -41,6 +41,19 @@ async function getUserAndMatch(matchId: string): Promise<GetMatchResult> {
   return { ok: true, supabase, user, match: data as MatchLockInfo };
 }
 
+async function isBetSealed(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("payments")
+    .select("status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const status = data?.status as string | undefined;
+  return status === "pending" || status === "approved";
+}
+
 function isLocked(status: string, kickoff_at: string) {
   if (status !== "scheduled") return true;
   return new Date(kickoff_at).getTime() - Date.now() <= CUTOFF_MS;
@@ -53,6 +66,10 @@ export async function upsertPrediction(input: unknown): Promise<ActionResult> {
   const got = await getUserAndMatch(parsed.data.match_id);
   if (!got.ok) return { ok: false, error: got.error };
   const { supabase, user, match } = got;
+
+  if (await isBetSealed(supabase, user.id)) {
+    return { ok: false, error: "Aposta já foi ativada — palpites travados." };
+  }
 
   if (isLocked(match.status, match.kickoff_at)) {
     return { ok: false, error: "Apostas para este jogo já estão fechadas." };
@@ -79,6 +96,10 @@ export async function deletePrediction(input: unknown): Promise<ActionResult> {
   const got = await getUserAndMatch(parsed.data.match_id);
   if (!got.ok) return { ok: false, error: got.error };
   const { supabase, user, match } = got;
+
+  if (await isBetSealed(supabase, user.id)) {
+    return { ok: false, error: "Aposta já foi ativada — palpites travados." };
+  }
 
   if (isLocked(match.status, match.kickoff_at)) {
     return { ok: false, error: "Apostas para este jogo já estão fechadas." };
