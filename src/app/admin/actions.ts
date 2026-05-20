@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedAdmin } from "@/lib/auth";
+import { buildUserBetsPdf } from "@/lib/bets-pdf";
+import { sendUserApprovalNotification } from "@/lib/email";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -51,6 +53,14 @@ export async function approvePayment(input: unknown): Promise<ActionResult> {
   if (!admin) return { ok: false, error: "Acesso negado." };
 
   const supabase = createClient();
+
+  // Descobre user_id do payment antes de update — pra gerar o PDF
+  const { data: paymentRow } = await supabase
+    .from("payments")
+    .select("user_id")
+    .eq("id", parsed.data.payment_id)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("payments")
     .update({
@@ -64,6 +74,24 @@ export async function approvePayment(input: unknown): Promise<ActionResult> {
   if (error) return { ok: false, error: error.message };
 
   await logAdmin(admin.id, "payment.approve", "payment", parsed.data.payment_id);
+
+  // Notifica o apostador com PDF anexo
+  try {
+    const targetUserId = paymentRow?.user_id as string | undefined;
+    if (targetUserId) {
+      const pdf = await buildUserBetsPdf(targetUserId);
+      if (pdf) {
+        await sendUserApprovalNotification({
+          user_name: pdf.name,
+          user_email: pdf.email,
+          pdfBytes: pdf.bytes,
+        });
+      }
+    }
+  } catch (e) {
+    console.error("[approvePayment] notificação user falhou", e);
+  }
+
   revalidatePath("/admin");
   return { ok: true };
 }

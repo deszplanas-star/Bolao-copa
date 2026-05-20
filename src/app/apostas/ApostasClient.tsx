@@ -86,7 +86,7 @@ export default function ApostasClient({
   });
   const [toast, setToast] = useState<string | null>(null);
   const [showPixModal, setShowPixModal] = useState(false);
-  const [paidChecked, setPaidChecked] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -556,18 +556,21 @@ export default function ApostasClient({
       {/* MODAL PIX */}
       {showPixModal && (
         <PixModal
-          paid={paidChecked}
-          setPaid={setPaidChecked}
+          receiptFile={receiptFile}
+          setReceiptFile={setReceiptFile}
           submitting={submittingPayment}
           onClose={() => !submittingPayment && setShowPixModal(false)}
           onCopy={() => setToast("Chave Pix copiada")}
           onConfirm={async () => {
+            if (!receiptFile) return;
             setSubmittingPayment(true);
-            const res = await submitPayment();
+            const fd = new FormData();
+            fd.append("receipt", receiptFile);
+            const res = await submitPayment(fd);
             setSubmittingPayment(false);
             if (res.ok) {
               setShowPixModal(false);
-              setPaidChecked(false);
+              setReceiptFile(null);
               setToast("Pagamento enviado · aguardando aprovação");
             } else {
               setToast(res.error);
@@ -1127,15 +1130,15 @@ function Stat({
 }
 
 function PixModal({
-  paid,
-  setPaid,
+  receiptFile,
+  setReceiptFile,
   submitting,
   onClose,
   onCopy,
   onConfirm,
 }: {
-  paid: boolean;
-  setPaid: (v: boolean) => void;
+  receiptFile: File | null;
+  setReceiptFile: (f: File | null) => void;
   submitting: boolean;
   onClose: () => void;
   onCopy: () => void;
@@ -1146,6 +1149,21 @@ function PixModal({
 
   function copy() {
     navigator.clipboard.writeText(pixKey).then(onCopy).catch(() => onCopy());
+  }
+
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (!f) {
+      setReceiptFile(null);
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      alert("Arquivo muito grande (máx 5MB).");
+      e.target.value = "";
+      setReceiptFile(null);
+      return;
+    }
+    setReceiptFile(f);
   }
 
   return (
@@ -1174,28 +1192,54 @@ function PixModal({
           <div className="font-mono text-[11px] uppercase tracking-widest text-mute mb-6">
             aposta única · 72 palpites
           </div>
-          <div className="w-32 h-32 mx-auto mb-6 bg-paper2 border-2 border-rule grid place-items-center font-mono text-[10px] text-mute uppercase tracking-widest">
-            QR aqui
+
+          <div className="text-left mb-4">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-mute mb-2">
+              ► 1. Pague o Pix
+            </div>
+            <button
+              onClick={copy}
+              className="w-full font-mono text-xs bg-paper2 px-4 py-3 border-2 border-dashed border-rule hover:bg-green/5 hover:border-green hover:text-green transition-colors break-all"
+            >
+              {pixKey}
+            </button>
+            <div className="font-serif italic text-[11px] text-soft mt-1.5">
+              Chave Pix CPF · clique para copiar
+            </div>
           </div>
-          <button
-            onClick={copy}
-            className="font-mono text-xs bg-paper2 px-4 py-2.5 border-2 border-dashed border-rule mb-5 hover:bg-green/5 hover:border-green hover:text-green transition-colors"
-          >
-            {pixKey}
-          </button>
-          <label className="flex items-center gap-2.5 p-3 bg-paper2 border border-rule mb-4 cursor-pointer text-sm text-left">
-            <input
-              type="checkbox"
-              checked={paid}
-              onChange={(e) => setPaid(e.target.checked)}
-              className="w-4 h-4 accent-green"
-            />
-            Já realizei o pagamento Pix
-          </label>
+
+          <div className="text-left">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-mute mb-2">
+              ► 2. Anexe o comprovante
+            </div>
+            <label
+              className={[
+                "block p-4 border-2 border-dashed cursor-pointer transition-colors",
+                receiptFile
+                  ? "border-green bg-green/5 text-green"
+                  : "border-rule bg-paper2 text-soft hover:border-ink hover:text-ink",
+              ].join(" ")}
+            >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                onChange={onPick}
+                className="hidden"
+                disabled={submitting}
+              />
+              <div className="font-anton text-sm uppercase tracking-wider">
+                {receiptFile ? "✓ " + truncate(receiptFile.name, 32) : "Selecionar arquivo"}
+              </div>
+              <div className="font-serif italic text-[11px] mt-1 opacity-80">
+                PNG, JPG, WEBP ou PDF · até 5 MB
+              </div>
+            </label>
+          </div>
+
           <button
             onClick={onConfirm}
-            disabled={!paid || submitting}
-            className="w-full px-4 py-3.5 bg-green text-paper font-anton text-sm uppercase tracking-wider border-2 border-green disabled:bg-rule disabled:border-rule disabled:text-mute disabled:cursor-not-allowed"
+            disabled={!receiptFile || submitting}
+            className="w-full mt-5 px-4 py-3.5 bg-green text-paper font-anton text-sm uppercase tracking-wider border-2 border-green disabled:bg-rule disabled:border-rule disabled:text-mute disabled:cursor-not-allowed"
           >
             {submitting ? "Enviando..." : "Confirmar pagamento"}
           </button>
@@ -1203,4 +1247,8 @@ function PixModal({
       </div>
     </div>
   );
+}
+
+function truncate(s: string, n: number) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
