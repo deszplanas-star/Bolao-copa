@@ -1,0 +1,2178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Bolão 26 — O bolão da Copa do Mundo 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,800;1,9..144,400;1,9..144,600&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #ffffff;
+    color: #0a1f44;
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     Brazilian flag palette: white / green / yellow / blue
+     ============================================================ */
+  :root {
+    --paper:    #ffffff;
+    --paper-2:  #f5f7fa;
+    --paper-3:  #e7ecf3;
+    --ink:      #002776;     /* Brazilian flag blue — used as dark surface */
+    --ink-2:    #1a3a72;
+    --soft:     #5a6a85;
+    --mute:     #8092ab;
+    --rule:     #d2dae5;
+    --rule-2:   #b6c1d2;
+    --orange:   #009739;     /* Brazilian flag green — primary accent (var name kept) */
+    --orange-2: #00b545;
+    --green:    #009739;
+    --yellow:   #FFDF00;     /* Brazilian flag yellow — secondary highlight */
+    --yellow-2: #ffe93d;
+    --red:      #ce1126;
+    --navy:     #002776;
+  }
+
+  ::selection { background: var(--yellow); color: var(--ink); }
+
+  .display { font-family: 'Anton', 'Bebas Neue', Impact, sans-serif; font-weight: 400; letter-spacing: 0; line-height: 0.92; text-transform: uppercase; }
+  .serif { font-family: 'Fraunces', Georgia, serif; font-style: italic; font-variation-settings: "opsz" 144; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum'; }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 32px; position: relative; }
+  @media (max-width: 700px) { .container { padding: 0 20px; } }
+
+  /* ============================================================
+     TOP UTILITY BAR — Bolanaarea-inspired
+     ============================================================ */
+  .utility {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 8px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .utility .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .utility .left { color: var(--paper-3); }
+  .utility .left .gold { color: var(--yellow); }
+  .utility .left .live {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--yellow);
+    margin-right: 16px;
+  }
+  .utility .left .live::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--yellow);
+    border-radius: 100%;
+    box-shadow: 0 0 8px var(--yellow);
+    animation: pulse 1.6s infinite;
+  }
+  .utility .right {
+    display: flex; gap: 16px;
+    color: var(--paper-3);
+  }
+  .utility .right a {
+    color: var(--paper-3);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .utility .right a:hover { color: var(--yellow); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ============================================================
+     MASTHEAD — newspaper style
+     ============================================================ */
+  .masthead {
+    border-bottom: 4px double var(--ink);
+    padding: 32px 0 28px;
+    background: var(--paper);
+  }
+  .masthead .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 18px;
+  }
+  .brand-mark {
+    width: 64px; height: 64px;
+    background: var(--orange);
+    color: var(--paper);
+    display: grid; place-items: center;
+    font-family: 'Anton', sans-serif;
+    font-size: 32px;
+    line-height: 1;
+    border-radius: 100%;
+    flex-shrink: 0;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .brand-name {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(40px, 5.5vw, 72px);
+    line-height: 0.88;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+  .brand-name .accent { color: var(--orange); }
+  .brand-tag {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--soft);
+    margin-top: 6px;
+    font-variation-settings: "opsz" 144;
+  }
+  .masthead-meta {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--soft);
+    line-height: 1.9;
+  }
+  @media (max-width: 600px) { .masthead-meta { text-align: left; } }
+  .masthead-meta strong { color: var(--ink); font-weight: 700; }
+  .masthead-meta .edition {
+    font-family: 'Anton', sans-serif;
+    font-size: 18px;
+    color: var(--orange);
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+
+  /* ============================================================
+     MAIN NAV — categories like a magazine
+     ============================================================ */
+  .mainnav {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--rule-2);
+  }
+  .mainnav .container {
+    display: flex;
+    align-items: stretch;
+    padding: 0 32px;
+  }
+  .mainnav a {
+    padding: 14px 18px;
+    color: var(--paper-3);
+    text-decoration: none;
+    font-family: 'Anton', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-right: 1px solid #333;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mainnav a:hover { background: var(--orange); color: var(--paper); }
+  .mainnav a.active { background: var(--orange); color: var(--paper); }
+  .mainnav a .arrow {
+    color: var(--orange);
+    font-size: 14px;
+    transition: color 0.2s;
+  }
+  .mainnav a:hover .arrow, .mainnav a.active .arrow { color: var(--paper); }
+
+  /* ============================================================
+     HERO BANNER — big sports magazine cover
+     ============================================================ */
+  .hero {
+    padding: 56px 0 48px;
+    border-bottom: 2px solid var(--ink);
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 40px;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  }
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--orange);
+    color: var(--paper);
+    padding: 6px 14px;
+    font-family: 'Anton', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .kicker::before { content: '►'; font-size: 10px; }
+  .hero-title {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(56px, 7vw, 110px);
+    line-height: 0.88;
+    letter-spacing: -0.005em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .hero-title .accent { color: var(--orange); }
+  .hero-title .ball {
+    display: inline-block;
+    transform: translateY(-0.04em) rotate(-8deg);
+    font-size: 0.85em;
+  }
+  .hero-deck {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(18px, 1.6vw, 24px);
+    line-height: 1.45;
+    color: var(--ink-2);
+    max-width: 38ch;
+    margin-bottom: 32px;
+    font-variation-settings: "opsz" 144;
+    font-weight: 400;
+  }
+  .hero-deck strong { font-weight: 600; color: var(--orange); }
+
+  /* HERO CTA */
+  .login-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 28px 18px 22px;
+    background: var(--ink);
+    color: var(--paper);
+    text-decoration: none;
+    font-family: 'Anton', sans-serif;
+    font-size: 17px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 2px solid var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 5px 5px 0 var(--orange);
+  }
+  .login-cta:hover {
+    background: var(--orange);
+    border-color: var(--orange);
+    box-shadow: 5px 5px 0 var(--ink);
+    transform: translate(-2px, -2px);
+  }
+  .login-cta:hover { box-shadow: 7px 7px 0 var(--ink); }
+  .login-cta .g {
+    width: 26px; height: 26px;
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 100%;
+    display: grid; place-items: center;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+    font-weight: 900;
+  }
+  .cta-row {
+    display: flex; align-items: center; gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .cta-secondary {
+    color: var(--ink);
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--orange);
+    padding-bottom: 4px;
+    font-weight: 600;
+  }
+  .cta-secondary:hover { color: var(--orange); }
+
+  .hero-fineprint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .hero-fineprint strong { color: var(--ink); font-weight: 700; }
+
+  /* hero logo solto à direita — dobro do tamanho */
+  .hero-stamp {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0;
+    overflow: visible;
+  }
+  .hero-stamp-trophy {
+    width: 100%;
+    max-width: 880px;
+    height: auto;
+    object-fit: contain;
+    display: block;
+  }
+
+  /* ============================================================
+     SECTION HEADER — newspaper style
+     ============================================================ */
+  section { padding: 64px 0; position: relative; }
+  .section-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 36px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--ink);
+    position: relative;
+    flex-wrap: wrap;
+  }
+  .section-head::after {
+    content: '';
+    position: absolute;
+    bottom: -8px; left: 0;
+    width: 80px; height: 2px;
+    background: var(--orange);
+  }
+  .section-title {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(36px, 6vw, 84px);
+    line-height: 0.92;
+    letter-spacing: -0.005em;
+    text-transform: uppercase;
+    color: var(--orange);          /* verde brasileiro · bold por padrão (Anton 900) */
+    font-weight: 900;
+  }
+  .section-title .arrow {
+    color: var(--orange);
+    margin-right: 10px;
+    font-family: 'Anton', sans-serif;
+  }
+  .section-title .serif {
+    font-family: 'Anton', sans-serif;
+    font-style: normal;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--orange);
+    letter-spacing: -0.005em;
+  }
+  .section-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--soft);
+    text-align: right;
+    line-height: 1.7;
+  }
+  .section-meta .accent { color: var(--orange); }
+
+  /* ============================================================
+     OS 12 GRUPOS — card grid (Bolanaarea inspired)
+     ============================================================ */
+  .groups {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 1000px) { .groups { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 750px)  { .groups { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px)  { .groups { grid-template-columns: 1fr; } }
+
+  .group-card {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--ink);
+    padding: 0;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+  .group-card:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--orange);
+  }
+  .group-card-head {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid var(--orange);
+  }
+  .group-card-head .letter {
+    font-family: 'Anton', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+  }
+  .group-card-head .letter .label { color: var(--orange); }
+  .group-card-head .games {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper-3);
+  }
+  .group-card-body { padding: 10px; }
+  .group-team {
+    display: grid;
+    grid-template-columns: 26px 28px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--paper-3);
+    font-size: 13px;
+  }
+  .group-team:last-child { border-bottom: none; }
+  .group-team .pos {
+    font-family: 'Anton', sans-serif;
+    font-size: 13px;
+    color: var(--mute);
+    text-align: center;
+    letter-spacing: 0;
+  }
+  .group-team.top2 .pos { color: var(--orange); }
+  .group-team .flag-img {
+    width: 26px;
+    height: 18px;
+    object-fit: cover;
+    display: block;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+  }
+  .group-team .name {
+    font-family: 'Anton', sans-serif;
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .group-team .pts {
+    font-family: 'Anton', sans-serif;
+    font-size: 16px;
+    color: var(--ink);
+  }
+  .group-team.top2 .name { color: var(--orange); }
+  .group-team.top2 .pts { color: var(--orange); }
+  .group-team.top2 { background: rgba(0, 151, 57, 0.08); margin: 0 -6px; padding: 8px 12px; border-bottom: 1px solid var(--paper-3); }
+
+  /* ============================================================
+     COMO JOGA — three steps editorial
+     ============================================================ */
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+  }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+  .step {
+    padding: 36px 28px;
+    border-right: 1px solid var(--rule);
+    position: relative;
+    background: var(--paper);
+    transition: background 0.3s;
+  }
+  .step:last-child { border-right: none; }
+  .step:hover { background: var(--paper-2); }
+  @media (max-width: 800px) {
+    .step { border-right: none; border-bottom: 1px solid var(--rule); }
+    .step:last-child { border-bottom: none; }
+  }
+  .step-num {
+    font-family: 'Anton', sans-serif;
+    font-size: 88px;
+    line-height: 0.85;
+    color: var(--orange);
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+  .step-tag {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 3px 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .step-head {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(24px, 2.4vw, 32px);
+    line-height: 1;
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+    margin-bottom: 14px;
+  }
+  .step-text {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-2);
+    max-width: 36ch;
+  }
+  .step-time {
+    margin-top: 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mute);
+  }
+
+  /* ============================================================
+     PONTUAÇÃO + PREMIAÇÃO
+     ============================================================ */
+  .points {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+  }
+  @media (max-width: 700px) { .points { grid-template-columns: 1fr; } }
+  .point {
+    padding: 40px 24px;
+    text-align: center;
+    border-right: 2px solid var(--ink);
+    position: relative;
+    transition: background 0.3s;
+  }
+  .point:last-child { border-right: none; }
+  .point:hover { background: var(--paper-2); }
+  @media (max-width: 700px) {
+    .point { border-right: none; border-bottom: 2px solid var(--ink); }
+    .point:last-child { border-bottom: none; }
+  }
+  .point-top {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 16px;
+  }
+  .point-num {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(120px, 16vw, 180px);
+    line-height: 0.85;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .point.exact .point-num { color: var(--orange); }
+  .point.zero .point-num { color: var(--rule-2); }
+  .point-label {
+    font-family: 'Anton', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 16px 0 12px;
+  }
+  .point-eg {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--soft);
+    font-variation-settings: "opsz" 144;
+  }
+  .point-eg .gold {
+    color: var(--orange);
+    font-style: normal;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  /* PREMIAÇÃO */
+  .prize-wrap { margin-top: 64px; }
+  .prize-head {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+  .prize-head h3 {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(28px, 3.5vw, 48px);
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 0.95;
+    color: var(--orange);
+    font-weight: 900;
+  }
+  .prize-head .serif { color: var(--orange); font-family: 'Anton', sans-serif; font-style: normal; text-transform: uppercase; font-weight: 900; letter-spacing: -0.005em; }
+
+  .prize-ladder {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 800px) { .prize-ladder { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 460px) { .prize-ladder { grid-template-columns: 1fr; } }
+  .prize-rung {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 24px 20px;
+    position: relative;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .prize-rung:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--orange);
+  }
+  .prize-rung.gold {
+    background: var(--yellow);
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  .prize-rung.gold:hover { box-shadow: 4px 4px 0 var(--orange); }
+  .prize-pos {
+    font-family: 'Anton', sans-serif;
+    font-size: 28px;
+    color: var(--orange);
+    line-height: 1;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .prize-rung.gold .prize-pos { color: var(--ink); }
+  .prize-name {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(22px, 2.5vw, 32px);
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+  .prize-pct {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(40px, 5vw, 64px);
+    line-height: 0.85;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .prize-rung.gold .prize-pct { color: var(--ink); }
+  .prize-rung.refund .prize-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--green);
+  }
+  .prize-side {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--soft);
+    margin-top: 8px;
+  }
+  .prize-rung.gold .prize-side { color: var(--ink-2); }
+  .prize-foot {
+    margin-top: 24px;
+    padding: 18px 22px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.5;
+    font-variation-settings: "opsz" 144;
+    border-left: 4px solid var(--orange);
+  }
+  .prize-foot strong { color: var(--yellow); font-weight: 600; }
+
+  /* ============================================================
+     INTERFACE PREVIEW
+     ============================================================ */
+  .interface-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  @media (max-width: 950px) { .interface-grid { grid-template-columns: 1fr; } }
+  .iface-bar {
+    grid-column: 1 / -1;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--orange);
+    flex-wrap: wrap; gap: 8px;
+  }
+  .iface-bar .brand-mini {
+    font-family: 'Anton', sans-serif;
+    color: var(--paper);
+    letter-spacing: 0.04em;
+    font-size: 14px;
+  }
+  .iface-bar .brand-mini .dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--yellow);
+    border-radius: 100%;
+    margin-right: 8px;
+    vertical-align: middle;
+    box-shadow: 0 0 8px var(--yellow);
+    animation: pulse 1.6s infinite;
+  }
+  .iface-bar .crumb { color: var(--paper-3); }
+  .iface-bar .user { color: var(--orange); }
+
+  .iface-tabs {
+    grid-column: 1 / -1;
+    display: flex;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper-2);
+    overflow-x: auto;
+  }
+  .iface-tab {
+    padding: 12px 18px;
+    font-family: 'Anton', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--soft);
+    border-right: 1px solid var(--rule);
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .iface-tab:hover { color: var(--ink); }
+  .iface-tab.active { color: var(--ink); background: var(--paper); border-bottom: 2px solid var(--orange); margin-bottom: -1px; }
+  .iface-tab .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    background: var(--rule);
+    color: var(--ink);
+  }
+  .iface-tab.active .count { background: var(--orange); color: var(--paper); }
+
+  .iface-matches {
+    padding: 24px 24px;
+    border-right: 1px solid var(--rule);
+  }
+  @media (max-width: 950px) { .iface-matches { border-right: none; border-bottom: 1px solid var(--rule); } }
+  .match {
+    padding: 18px 0;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .match:last-child { border-bottom: none; }
+  .match-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--soft);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .match-meta .saved { color: var(--green); display: inline-flex; align-items: center; gap: 6px; }
+  .match-meta .saved::before { content: '✓'; }
+  .match-meta .live { color: var(--orange); display: inline-flex; align-items: center; gap: 6px; }
+  .match-meta .live::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--orange);
+    border-radius: 100%;
+    animation: pulse 1.6s infinite;
+  }
+  .match-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 24px;
+  }
+  @media (max-width: 700px) {
+    .match-row { grid-template-columns: 1fr; gap: 12px; text-align: center; }
+  }
+  .match-team {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(18px, 2vw, 26px);
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+  }
+  .match-team.right { justify-content: flex-end; }
+  @media (max-width: 700px) {
+    .match-team, .match-team.right { justify-content: center; }
+  }
+  .match-flag {
+    width: 48px;
+    height: 32px;
+    object-fit: cover;
+    display: inline-block;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    vertical-align: middle;
+  }
+  .match-score { display: flex; align-items: center; gap: 10px; }
+  .match-input {
+    width: 64px; height: 76px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    color: var(--ink);
+    font-family: 'Anton', sans-serif;
+    font-size: 44px;
+    text-align: center;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+  }
+  .match-input.active {
+    background: var(--orange);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .match-input.empty {
+    border-style: dashed;
+    color: var(--rule-2);
+  }
+  .match-x {
+    font-family: 'Anton', sans-serif;
+    font-size: 22px;
+    color: var(--soft);
+  }
+
+  /* CLASSIFICAÇÃO */
+  .standing { padding: 24px 24px; }
+  .standing-head {
+    font-family: 'Anton', sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 4px;
+    border-bottom: 2px solid var(--orange);
+    padding-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .standing-head .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--orange);
+  }
+  .standing-sub {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 12px;
+    color: var(--mute);
+    margin-bottom: 14px;
+    font-variation-settings: "opsz" 144;
+  }
+  .standing-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .standing-table th {
+    text-align: left;
+    padding: 6px 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--soft);
+    font-weight: 500;
+    border-bottom: 1px solid var(--rule);
+  }
+  .standing-table th.num { text-align: right; }
+  .standing-table td {
+    padding: 9px 4px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .standing-table td.num {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .standing-table tr.qualified td {
+    background: rgba(0, 151, 57, 0.08);
+  }
+  .standing-table tr.qualified td:first-child { border-left: 3px solid var(--orange); padding-left: 6px; }
+  .standing-table tr.qualified td.team strong { color: var(--orange); }
+  .standing-table .team-cell {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .standing-table .team-cell .flag-img-sm {
+    width: 22px;
+    height: 15px;
+    object-fit: cover;
+    display: block;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .standing-table .team-cell strong {
+    font-family: 'Anton', sans-serif;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    font-weight: 400;
+  }
+  .standing-table .pts {
+    font-family: 'Anton', sans-serif;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .standing-table tr.qualified .pts { color: var(--orange); }
+
+  .iface-foot {
+    grid-column: 1 / -1;
+    padding: 16px 24px;
+    background: var(--paper-2);
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap; gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+  .iface-foot .progress { display: flex; align-items: center; gap: 12px; }
+  .iface-foot .progress-bar { width: 120px; height: 6px; background: var(--paper); border: 1px solid var(--rule); position: relative; overflow: hidden; }
+  .iface-foot .progress-bar::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 86%; background: var(--orange); }
+  .iface-foot .pct { color: var(--orange); font-weight: 600; }
+  .iface-foot .iface-cta {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 18px;
+    font-family: 'Anton', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    border: 2px solid var(--ink);
+    transition: background 0.2s;
+  }
+  .iface-foot .iface-cta:hover { background: var(--orange); border-color: var(--orange); }
+  .iface-foot .iface-cta::after { content: ' →'; color: var(--orange); }
+  .iface-foot .iface-cta:hover::after { color: var(--paper); }
+
+  /* DESIGN NOTES */
+  .design-notes {
+    margin-top: 36px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+  }
+  @media (max-width: 800px) { .design-notes { grid-template-columns: repeat(2, 1fr); } }
+  .design-note {
+    padding: 22px 20px;
+    border-right: 1px solid var(--rule);
+  }
+  .design-note:last-child { border-right: none; }
+  @media (max-width: 800px) {
+    .design-note { border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+    .design-note:nth-child(2n) { border-right: none; }
+    .design-note:nth-last-child(-n+2) { border-bottom: none; }
+  }
+  .design-note .label {
+    font-family: 'Anton', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 10px;
+  }
+  .design-note .label::before { content: '► '; }
+  .design-note .body { font-size: 13px; color: var(--ink-2); line-height: 1.55; }
+  .design-note .body em {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: var(--orange);
+    font-variation-settings: "opsz" 144;
+  }
+  .swatch-row { display: flex; gap: 6px; margin-top: 6px; }
+  .swatch { width: 26px; height: 26px; border: 2px solid var(--ink); }
+  .swatch.b { background: var(--ink); }              /* azul */
+  .swatch.w { background: var(--paper); }            /* branco */
+  .swatch.g { background: var(--orange); border-color: var(--orange); }  /* verde */
+  .swatch.y { background: var(--yellow); border-color: var(--yellow); }  /* amarelo */
+
+  /* ============================================================
+     STACK / BANCO / API / SEGURANÇA
+     ============================================================ */
+  .build-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 32px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+  .build-row:first-child { border-top: 2px solid var(--ink); }
+  .build-row:last-child { border-bottom: 2px solid var(--ink); }
+  @media (max-width: 800px) {
+    .build-row { grid-template-columns: 1fr; gap: 12px; }
+  }
+  .build-label {
+    font-family: 'Anton', sans-serif;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--orange);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .build-label .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--soft);
+    letter-spacing: 0.06em;
+  }
+  .build-content {
+    font-size: clamp(16px, 1.4vw, 19px);
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .build-content em {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    color: var(--orange);
+    font-variation-settings: "opsz" 144;
+  }
+  .build-content .sep { color: var(--rule-2); margin: 0 0.4em; }
+  .build-content .mute {
+    color: var(--soft);
+    font-size: 0.85em;
+    display: block;
+    margin-top: 8px;
+  }
+
+  .sub-block { margin-top: 56px; }
+  .sub-head {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 22px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 8px;
+    position: relative;
+  }
+  .sub-head::after {
+    content: '';
+    position: absolute;
+    bottom: -7px; left: 0;
+    width: 60px; height: 2px;
+    background: var(--orange);
+  }
+  .sub-head h3 {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(22px, 2.6vw, 36px);
+    text-transform: uppercase;
+    letter-spacing: -0.005em;
+    color: var(--orange);
+    font-weight: 900;
+  }
+  .sub-head .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--soft);
+  }
+
+  .schema {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0 32px;
+  }
+  @media (max-width: 700px) { .schema { grid-template-columns: 1fr; } }
+  .schema-table {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .schema-table h4 {
+    font-family: 'Anton', sans-serif;
+    font-size: 17px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 8px;
+    letter-spacing: 0.02em;
+  }
+  .schema-table h4::before { content: '►'; color: var(--orange); font-size: 11px; }
+  .schema-table p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    line-height: 1.7;
+  }
+  .schema-table p .pk { color: var(--orange); font-weight: 600; }
+  .schema-table p .note { color: var(--soft); font-style: italic; }
+
+  .endpoint-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 24px;
+  }
+  @media (max-width: 800px) { .endpoint-list { grid-template-columns: 1fr; } }
+  .endpoint-row {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .endpoint-row .top {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .endpoint-row .verb {
+    font-family: 'Anton', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border: 2px solid;
+    text-transform: uppercase;
+  }
+  .endpoint-row .verb.get  { color: var(--orange); border-color: var(--orange); }
+  .endpoint-row .verb.post { color: var(--green); border-color: var(--green); }
+  .endpoint-row .verb.put  { color: var(--navy); border-color: var(--navy); }
+  .endpoint-row .path { color: var(--ink); font-size: 13px; font-weight: 500; }
+  .endpoint-row .desc { font-size: 12.5px; color: var(--soft); margin-top: 2px; }
+
+  .security {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border: 2px solid var(--ink);
+  }
+  @media (max-width: 800px) { .security { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .security { grid-template-columns: 1fr; } }
+  .sec {
+    padding: 22px 18px;
+    border-right: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    transition: background 0.2s;
+  }
+  .sec:hover { background: var(--paper-2); }
+  .sec:nth-child(3n) { border-right: none; }
+  .sec:nth-last-child(-n+3) { border-bottom: none; }
+  @media (max-width: 800px) {
+    .sec:nth-child(3n) { border-right: 1px solid var(--rule); }
+    .sec:nth-child(2n) { border-right: none; }
+    .sec:nth-last-child(-n+3) { border-bottom: 1px solid var(--rule); }
+    .sec:nth-last-child(-n+2) { border-bottom: none; }
+  }
+  @media (max-width: 500px) {
+    .sec { border-right: none !important; border-bottom: 1px solid var(--rule) !important; }
+    .sec:last-child { border-bottom: none !important; }
+  }
+  .sec .n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--orange);
+    letter-spacing: 0.14em;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .sec h5 {
+    font-family: 'Anton', sans-serif;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+  }
+  .sec p { font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+
+  /* ============================================================
+     CALENDÁRIO
+     ============================================================ */
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 900px) { .timeline { grid-template-columns: 1fr; } }
+  .sprint {
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    padding: 22px 18px;
+    box-shadow: 4px 4px 0 var(--ink);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .sprint:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--orange);
+  }
+  .sprint.launch {
+    background: var(--orange);
+    color: var(--paper);
+  }
+  .sprint.launch:hover { box-shadow: 6px 6px 0 var(--ink); }
+  .sprint-week {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--soft);
+    display: flex; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .sprint.launch .sprint-week { color: var(--paper-3); }
+  .sprint-week .n { color: var(--orange); }
+  .sprint.launch .sprint-week .n { color: var(--yellow); }
+  .sprint-name {
+    font-family: 'Anton', sans-serif;
+    font-size: 24px;
+    line-height: 0.95;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    letter-spacing: -0.005em;
+  }
+  .sprint ul {
+    list-style: none;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--ink-2);
+  }
+  .sprint.launch ul { color: var(--paper); }
+  .sprint ul li {
+    padding-left: 14px;
+    position: relative;
+    margin-bottom: 2px;
+  }
+  .sprint ul li::before {
+    content: '►';
+    position: absolute;
+    left: 0;
+    color: var(--orange);
+    font-size: 9px;
+    top: 4px;
+  }
+  .sprint.launch ul li::before { color: var(--yellow); }
+
+  .deadline {
+    margin-top: 48px;
+    padding: 36px;
+    background: var(--ink);
+    color: var(--paper);
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 32px;
+    align-items: center;
+    border: 2px solid var(--ink);
+    box-shadow: 8px 8px 0 var(--orange);
+  }
+  @media (max-width: 800px) {
+    .deadline { grid-template-columns: 1fr; gap: 18px; padding: 28px; }
+  }
+  .deadline-date {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(56px, 10vw, 140px);
+    line-height: 0.85;
+    color: var(--orange);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .deadline-text {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: var(--paper-3);
+    line-height: 1.5;
+    font-variation-settings: "opsz" 144;
+    max-width: 32ch;
+  }
+  .deadline-text strong {
+    font-family: 'Anton', sans-serif;
+    font-style: normal;
+    color: var(--paper);
+    text-transform: uppercase;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    display: block;
+    margin-bottom: 10px;
+  }
+  .deadline-text .accent { color: var(--yellow); font-style: normal; }
+
+  /* ============================================================
+     COLABORE / FOOTER — Bolanaarea inspired
+     ============================================================ */
+  .colabore {
+    background: var(--orange);
+    color: var(--paper);
+    padding: 56px 0;
+    border-top: 4px double var(--ink);
+    border-bottom: 4px double var(--ink);
+  }
+  .colabore-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  @media (max-width: 800px) {
+    .colabore-grid { grid-template-columns: 1fr; gap: 24px; }
+  }
+  .colabore h2 {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(48px, 7vw, 96px);
+    line-height: 0.88;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .colabore h2 .arrow { color: var(--yellow); }
+  .colabore p {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--paper);
+    font-variation-settings: "opsz" 144;
+    max-width: 36ch;
+  }
+  .colabore-cta {
+    text-align: center;
+  }
+  .colabore-cta .login-cta {
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--paper);
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+  .colabore-cta .login-cta:hover {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+    box-shadow: 7px 7px 0 var(--paper);
+  }
+  .colabore-cta .login-cta .g { background: var(--ink); color: var(--paper); }
+  .colabore-cta .login-cta:hover .g { background: var(--paper); color: var(--ink); }
+  .colabore-fineprint {
+    margin-top: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--paper);
+  }
+  .colabore-fineprint strong { color: var(--yellow); font-weight: 700; }
+
+  footer {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 48px 0 32px;
+  }
+  .colofon-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 36px;
+    align-items: end;
+  }
+  @media (max-width: 800px) {
+    .colofon-grid { grid-template-columns: 1fr; gap: 20px; }
+  }
+  .colofon-mark {
+    font-family: 'Anton', sans-serif;
+    font-size: clamp(40px, 6vw, 80px);
+    line-height: 0.88;
+    letter-spacing: -0.005em;
+    text-transform: uppercase;
+  }
+  .colofon-mark .accent { color: var(--orange); }
+  .colofon-mark .ball { transform: translateY(-0.05em) rotate(-8deg); display: inline-block; font-size: 0.85em; }
+  .colofon-block {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--paper-3);
+    line-height: 2;
+  }
+  .colofon-block strong { color: var(--paper); font-weight: 700; }
+  .colofon-block .accent { color: var(--orange); }
+  .colofon-block.right { text-align: right; }
+  @media (max-width: 800px) { .colofon-block.right { text-align: left; } }
+
+  .copyright {
+    margin-top: 36px;
+    padding-top: 18px;
+    border-top: 1px solid #333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mute);
+    text-align: center;
+  }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity 0.7s cubic-bezier(0.2,0,0,1), transform 0.7s cubic-bezier(0.2,0,0,1); }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+  .reveal.delay-1 { transition-delay: 0.08s; }
+  .reveal.delay-2 { transition-delay: 0.16s; }
+  .reveal.delay-3 { transition-delay: 0.24s; }
+
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     UTILITY BAR
+     ============================================================ -->
+<div class="utility">
+  <div class="container">
+    <div class="left">
+      <span class="live">SPEC EM REVISÃO</span>
+      <span>Edição <span class="gold">v1.0</span></span>
+      <span style="margin: 0 12px;">·</span>
+      <span>Maio · 2026</span>
+    </div>
+    <div class="right">
+      <a href="#">contato</a>
+      <a href="#">whatsapp</a>
+      <a href="#">instagram</a>
+      <a href="#">favoritar (Ctrl+D)</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MASTHEAD
+     ============================================================ -->
+<header class="masthead">
+  <div class="container">
+    <div class="brand">
+      <div class="brand-mark">⚽</div>
+      <div>
+        <div class="brand-name">Bolão <span class="accent">26</span></div>
+        <div class="brand-tag">o bolão da Copa do Mundo FIFA 2026 · 48 seleções, 12 grupos, 1 campeão</div>
+      </div>
+    </div>
+    <div class="masthead-meta">
+      <div class="edition">Edição Nº 01</div>
+      <div>Quarta-feira, <strong>06.05.2026</strong></div>
+      <div>72 jogos · fase de grupos</div>
+      <div>Estreia: <strong>11 de junho</strong></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     MAIN NAV
+     ============================================================ -->
+<nav class="mainnav">
+  <div class="container">
+    <a href="#hero" class="active"><span class="arrow">►</span> Capa</a>
+    <a href="#grupos"><span class="arrow">►</span> Os 12 grupos</a>
+    <a href="#como"><span class="arrow">►</span> Como joga</a>
+    <a href="#regras"><span class="arrow">►</span> Regras</a>
+    <a href="#interface"><span class="arrow">►</span> Tela ao vivo</a>
+    <a href="#construcao"><span class="arrow">►</span> Construção</a>
+    <a href="#calendario"><span class="arrow">►</span> Calendário</a>
+    <a href="#colabore"><span class="arrow">►</span> Entrar</a>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section class="hero" id="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <div class="kicker reveal">Documento de produto · Lançamento 20.05.26</div>
+        <h1 class="hero-title reveal delay-1" style="margin-bottom: 32px;">
+          O bolão<br/>da <span class="accent">Copa</span><br/>
+          <span class="accent">2026</span> <span class="ball">⚽</span>
+        </h1>
+        <div class="cta-row reveal delay-3">
+          <a href="/login" class="login-cta">
+            <span class="g">G</span>
+            Entrar com Google
+            <span>→</span>
+          </a>
+          <a href="#regras" class="cta-secondary">Ver as regras</a>
+        </div>
+        <div class="hero-fineprint reveal delay-3">
+          Sem cadastro <span style="margin: 0 8px;">·</span> Sem senha <span style="margin: 0 8px;">·</span> <strong>4 minutos</strong> até a primeira aposta
+        </div>
+      </div>
+
+      <div class="hero-stamp reveal delay-2">
+        <img class="hero-stamp-trophy" src="logo copa do mundo.webp" alt="Copa do Mundo FIFA 2026">
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     GRUPOS
+     ============================================================ -->
+<section id="grupos">
+  <div class="container">
+    <div class="section-head reveal">
+      <div>
+        <h2 class="section-title"><span class="arrow">►</span> Fase de <span class="serif">Grupos</span></h2>
+      </div>
+      <div class="section-meta">
+        <div>48 seleções · 12 grupos · 4 por grupo</div>
+        <div>72 jogos na fase inicial</div>
+        <div><span class="accent">Top 2</span> avança · 8 melhores 3ºs</div>
+      </div>
+    </div>
+
+    <div class="groups">
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> A</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/mx.png" alt="México"><span class="name">México</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/dk.png" alt="Dinamarca"><span class="name">Dinamarca</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/kr.png" alt="Coreia do Sul"><span class="name">Coreia do Sul</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/za.png" alt="África do Sul"><span class="name">África do Sul</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> B</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/ch.png" alt="Suíça"><span class="name">Suíça</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/ca.png" alt="Canadá"><span class="name">Canadá</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/ba.png" alt="Bósnia"><span class="name">Bósnia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/qa.png" alt="Catar"><span class="name">Catar</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> C</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/br.png" alt="Brasil"><span class="name">Brasil</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/ma.png" alt="Marrocos"><span class="name">Marrocos</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/gb-sct.png" alt="Escócia"><span class="name">Escócia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/ht.png" alt="Haiti"><span class="name">Haiti</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> D</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/us.png" alt="Estados Unidos"><span class="name">Estados Unidos</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/py.png" alt="Paraguai"><span class="name">Paraguai</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/au.png" alt="Austrália"><span class="name">Austrália</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/tr.png" alt="Turquia"><span class="name">Turquia</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> E</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/de.png" alt="Alemanha"><span class="name">Alemanha</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/ec.png" alt="Equador"><span class="name">Equador</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/ci.png" alt="Costa do Marfim"><span class="name">Costa do Marfim</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/cw.png" alt="Curaçau"><span class="name">Curaçau</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> F</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/nl.png" alt="Holanda"><span class="name">Holanda</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/jp.png" alt="Japão"><span class="name">Japão</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/se.png" alt="Suécia"><span class="name">Suécia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/tn.png" alt="Tunísia"><span class="name">Tunísia</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> G</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/be.png" alt="Bélgica"><span class="name">Bélgica</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/eg.png" alt="Egito"><span class="name">Egito</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/ir.png" alt="Irã"><span class="name">Irã</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/nz.png" alt="Nova Zelândia"><span class="name">Nova Zelândia</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> H</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/es.png" alt="Espanha"><span class="name">Espanha</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/uy.png" alt="Uruguai"><span class="name">Uruguai</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/cv.png" alt="Cabo Verde"><span class="name">Cabo Verde</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/sa.png" alt="Arábia Saudita"><span class="name">Arábia Saudita</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> I</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/fr.png" alt="França"><span class="name">França</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/no.png" alt="Noruega"><span class="name">Noruega</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/sn.png" alt="Senegal"><span class="name">Senegal</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/iq.png" alt="Iraque"><span class="name">Iraque</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> J</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/ar.png" alt="Argentina"><span class="name">Argentina</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/at.png" alt="Áustria"><span class="name">Áustria</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/dz.png" alt="Argélia"><span class="name">Argélia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/jo.png" alt="Jordânia"><span class="name">Jordânia</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> K</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/pt.png" alt="Portugal"><span class="name">Portugal</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/co.png" alt="Colômbia"><span class="name">Colômbia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/uz.png" alt="Uzbequistão"><span class="name">Uzbequistão</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/cd.png" alt="RD Congo"><span class="name">RD Congo</span><span class="pts">-</span></div>
+        </div>
+      </div>
+      <div class="group-card reveal">
+        <div class="group-card-head"><span class="letter"><span class="label">Grupo</span> L</span><span class="games">6 jogos</span></div>
+        <div class="group-card-body">
+          <div class="group-team top2"><span class="pos">1ª</span><img class="flag-img" src="https://flagcdn.com/w40/gb-eng.png" alt="Inglaterra"><span class="name">Inglaterra</span><span class="pts">-</span></div>
+          <div class="group-team top2"><span class="pos">2ª</span><img class="flag-img" src="https://flagcdn.com/w40/hr.png" alt="Croácia"><span class="name">Croácia</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">3ª</span><img class="flag-img" src="https://flagcdn.com/w40/gh.png" alt="Gana"><span class="name">Gana</span><span class="pts">-</span></div>
+          <div class="group-team"><span class="pos">4ª</span><img class="flag-img" src="https://flagcdn.com/w40/pa.png" alt="Panamá"><span class="name">Panamá</span><span class="pts">-</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COMO JOGA
+     ============================================================ -->
+<section id="como">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 class="section-title"><span class="arrow">►</span> Como <span class="serif">se joga</span></h2>
+      <div class="section-meta">
+        <div>UX em <span class="accent">3 momentos</span></div>
+        <div>4 minutos · do clique à aposta</div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <div class="step-tag">Entender</div>
+        <div class="step-head">Lê as regras</div>
+        <p class="step-text">Placar exato vale 3, vencer/empatar vale 1, errado é zero. Aposta única, R$ 50 via Pix. Última colocação devolve. Pronto.</p>
+        <div class="step-time">~ 30 segundos</div>
+      </div>
+      <div class="step reveal delay-1">
+        <div class="step-num">02</div>
+        <div class="step-tag">Entrar</div>
+        <div class="step-head">Logar com Google</div>
+        <p class="step-text">Um toque, autoriza a conta, cai direto no dashboard. Sem formulário, sem senha, sem confirmação por e-mail.</p>
+        <div class="step-time">~ 15 segundos</div>
+      </div>
+      <div class="step reveal delay-2">
+        <div class="step-num">03</div>
+        <div class="step-tag">Usar</div>
+        <div class="step-head">Apostar e acompanhar</div>
+        <p class="step-text">Preenche os 72 placares, paga o Pix, marca "já paguei". O ranking se reordena ao vivo a cada jogo finalizado. Resumo diário no inbox.</p>
+        <div class="step-time">~ 3 minutos</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     REGRAS
+     ============================================================ -->
+<section id="regras">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 class="section-title"><span class="arrow">►</span> As <span class="serif">regras</span></h2>
+      <div class="section-meta">
+        <div>Pontuação · Premiação</div>
+        <div>Modelo simples e <span class="accent">transparente</span></div>
+      </div>
+    </div>
+
+    <div class="points">
+      <div class="point exact reveal">
+        <div class="point-top">Acerto cravado</div>
+        <div class="point-num">+3</div>
+        <div class="point-label">Placar exato</div>
+        <div class="point-eg">apostou <span class="gold">2×1</span> · saiu <span class="gold">2×1</span></div>
+      </div>
+      <div class="point reveal delay-1">
+        <div class="point-top">Acerto parcial</div>
+        <div class="point-num">+1</div>
+        <div class="point-label">Vencedor / empate</div>
+        <div class="point-eg">apostou <span class="gold">1×0</span> · saiu <span class="gold">2×1</span></div>
+      </div>
+      <div class="point zero reveal delay-2">
+        <div class="point-top">Errou</div>
+        <div class="point-num">0</div>
+        <div class="point-label">Resultado errado</div>
+        <div class="point-eg">apostou <span class="gold">1×1</span> · saiu <span class="gold">2×1</span></div>
+      </div>
+    </div>
+
+    <div class="prize-wrap">
+      <div class="prize-head reveal">
+        <h3>O bolo se divide <span class="serif">em quatro.</span></h3>
+      </div>
+
+      <div class="prize-ladder">
+        <div class="prize-rung gold reveal">
+          <div class="prize-pos">1º</div>
+          <div class="prize-name">Campeão</div>
+          <div class="prize-pct">70%</div>
+          <div class="prize-side">Maior pontuação</div>
+        </div>
+        <div class="prize-rung reveal delay-1">
+          <div class="prize-pos">2º</div>
+          <div class="prize-name">Vice</div>
+          <div class="prize-pct">20%</div>
+          <div class="prize-side">Segunda maior</div>
+        </div>
+        <div class="prize-rung reveal delay-2">
+          <div class="prize-pos">3º</div>
+          <div class="prize-name">Pódio</div>
+          <div class="prize-pct">10%</div>
+          <div class="prize-side">Terceira maior</div>
+        </div>
+        <div class="prize-rung refund reveal delay-3">
+          <div class="prize-pos">↩</div>
+          <div class="prize-name">Lanterna</div>
+          <div class="prize-pct">Reembolso</div>
+          <div class="prize-side">Última colocação</div>
+        </div>
+      </div>
+
+      <p class="prize-foot reveal">
+        O último colocado recupera <strong>o valor da aposta</strong>. O resto se distribui entre os três primeiros, calculado automaticamente sobre o pool aprovado. Anti-frustração, anti-abandono.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     INTERFACE
+     ============================================================ -->
+<section id="interface">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 class="section-title"><span class="arrow">►</span> A <span class="serif">tela</span> ao vivo</h2>
+      <div class="section-meta">
+        <div>Preview da interface</div>
+        <div>Mobile · tablet · <span class="accent">desktop</span></div>
+      </div>
+    </div>
+
+    <div class="interface-grid reveal">
+      <div class="iface-bar">
+        <span class="brand-mini"><span class="dot"></span> Bolão / 26</span>
+        <span class="crumb">bolaocopa26.com / apostas / grupo-c</span>
+        <span class="user">Pedro Silva ▸</span>
+      </div>
+      <div class="iface-tabs">
+        <span class="iface-tab active">Apostas <span class="count">62/72</span></span>
+        <span class="iface-tab">Ranking <span class="count">5º</span></span>
+        <span class="iface-tab">Resultados <span class="count">8</span></span>
+        <span class="iface-tab">Minhas apostas</span>
+      </div>
+
+      <div class="iface-matches">
+        <div class="match">
+          <div class="match-meta">
+            <span>Jogo 1 · 14.06 · 13:00 · SoFi Stadium</span>
+            <span class="saved">aposta salva · +3 pts possíveis</span>
+          </div>
+          <div class="match-row">
+            <div class="match-team"><img class="match-flag" src="https://flagcdn.com/w80/br.png" alt="Brasil"> Brasil</div>
+            <div class="match-score">
+              <input class="match-input active" value="2" readonly>
+              <span class="match-x">×</span>
+              <input class="match-input active" value="0" readonly>
+            </div>
+            <div class="match-team right">Marrocos <img class="match-flag" src="https://flagcdn.com/w80/ma.png" alt="Marrocos"></div>
+          </div>
+        </div>
+        <div class="match">
+          <div class="match-meta">
+            <span>Jogo 2 · 18.06 · 16:00 · MetLife Stadium</span>
+            <span class="saved">aposta salva</span>
+          </div>
+          <div class="match-row">
+            <div class="match-team"><img class="match-flag" src="https://flagcdn.com/w80/gb-sct.png" alt="Escócia"> Escócia</div>
+            <div class="match-score">
+              <input class="match-input" value="1" readonly>
+              <span class="match-x">×</span>
+              <input class="match-input" value="2" readonly>
+            </div>
+            <div class="match-team right">Brasil <img class="match-flag" src="https://flagcdn.com/w80/br.png" alt="Brasil"></div>
+          </div>
+        </div>
+        <div class="match">
+          <div class="match-meta">
+            <span>Jogo 3 · 23.06 · 16:00 · Mercedes-Benz Stadium</span>
+            <span class="live">cutoff em 23h 11min</span>
+          </div>
+          <div class="match-row">
+            <div class="match-team"><img class="match-flag" src="https://flagcdn.com/w80/br.png" alt="Brasil"> Brasil</div>
+            <div class="match-score">
+              <input class="match-input empty" value="" readonly placeholder="–">
+              <span class="match-x">×</span>
+              <input class="match-input empty" value="" readonly placeholder="–">
+            </div>
+            <div class="match-team right">Haiti <img class="match-flag" src="https://flagcdn.com/w80/ht.png" alt="Haiti"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="standing">
+        <div class="standing-head">
+          <span>Grupo C</span>
+          <span class="badge">ao vivo</span>
+        </div>
+        <div class="standing-sub">recalcula a cada palpite digitado</div>
+        <table class="standing-table">
+          <thead>
+            <tr><th>Pos</th><th>Seleção</th><th class="num">P</th><th class="num">SG</th></tr>
+          </thead>
+          <tbody>
+            <tr class="qualified">
+              <td>1ª</td>
+              <td><div class="team-cell"><img class="flag-img-sm" src="https://flagcdn.com/w20/br.png" alt="BR"><strong>Brasil</strong></div></td>
+              <td class="num pts">9</td>
+              <td class="num">+6</td>
+            </tr>
+            <tr class="qualified">
+              <td>2ª</td>
+              <td><div class="team-cell"><img class="flag-img-sm" src="https://flagcdn.com/w20/ma.png" alt="MA"><strong>Marrocos</strong></div></td>
+              <td class="num pts">4</td>
+              <td class="num">0</td>
+            </tr>
+            <tr>
+              <td>3ª</td>
+              <td><div class="team-cell"><img class="flag-img-sm" src="https://flagcdn.com/w20/gb-sct.png" alt="SCT"><strong>Escócia</strong></div></td>
+              <td class="num pts">3</td>
+              <td class="num">−2</td>
+            </tr>
+            <tr>
+              <td>4ª</td>
+              <td><div class="team-cell"><img class="flag-img-sm" src="https://flagcdn.com/w20/ht.png" alt="HT"><strong>Haiti</strong></div></td>
+              <td class="num pts">1</td>
+              <td class="num">−4</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="iface-foot">
+        <div class="progress">
+          <span>62 / 72 palpites</span>
+          <div class="progress-bar"></div>
+          <span class="pct">86%</span>
+        </div>
+        <span class="iface-cta">Ativar aposta · R$ 50</span>
+      </div>
+    </div>
+
+    <div class="design-notes reveal">
+      <div class="design-note">
+        <div class="label">Tipografia</div>
+        <div class="body">Anton para deslocar manchete. <em>Fraunces</em> para respirar. Inter para ler. JetBrains Mono nos detalhes técnicos.</div>
+      </div>
+      <div class="design-note">
+        <div class="label">Paleta</div>
+        <div class="body">As <em>quatro cores</em> da bandeira: verde, amarelo, azul, branco.</div>
+        <div class="swatch-row">
+          <div class="swatch g"></div>
+          <div class="swatch y"></div>
+          <div class="swatch b"></div>
+          <div class="swatch w"></div>
+        </div>
+      </div>
+      <div class="design-note">
+        <div class="label">Movimento</div>
+        <div class="body">Hover com offset de sombra (estilo brutalist), reveal on scroll, reordenação suave do ranking.</div>
+      </div>
+      <div class="design-note">
+        <div class="label">Densidade</div>
+        <div class="body">Tabela de classificação respirando ao lado dos placares. Inspirado em <em>jornal esportivo</em> brasileiro.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CONSTRUÇÃO
+     ============================================================ -->
+<section id="construcao">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 class="section-title"><span class="arrow">►</span> A <span class="serif">construção</span></h2>
+      <div class="section-meta">
+        <div>Stack · Banco · API · Segurança</div>
+        <div>Cinco semanas até o lançamento</div>
+      </div>
+    </div>
+
+    <div class="build-row reveal">
+      <div class="build-label"><span class="num">01</span> Front</div>
+      <div class="build-content">
+        Next.js 14 <span class="sep">·</span> React <span class="sep">·</span> Tailwind <span class="sep">·</span> Framer Motion <span class="sep">·</span> shadcn/ui <span class="sep">·</span> React Query
+        <span class="mute">SSR para landing, client para apostas, optimistic UI em todo input.</span>
+      </div>
+    </div>
+    <div class="build-row reveal">
+      <div class="build-label"><span class="num">02</span> Back</div>
+      <div class="build-content">
+        Node 20 <span class="sep">·</span> Route Handlers do Next <span class="sep">·</span> Zod <span class="sep">·</span> Prisma <span class="sep">·</span> Resend
+        <span class="mute">Sem servidor para gerenciar, validação tipada de ponta a ponta.</span>
+      </div>
+    </div>
+    <div class="build-row reveal">
+      <div class="build-label"><span class="num">03</span> Banco & Auth</div>
+      <div class="build-content">
+        PostgreSQL gerenciado pelo Supabase <span class="sep">·</span> Auth via Google OAuth <span class="sep">·</span> RLS por tabela <span class="sep">·</span> Realtime via WebSocket
+        <span class="mute">Defesa em profundidade até no SQL.</span>
+      </div>
+    </div>
+    <div class="build-row reveal">
+      <div class="build-label"><span class="num">04</span> Infra</div>
+      <div class="build-content">
+        Vercel <span class="sep">·</span> Supabase <span class="sep">·</span> Cron diário 23:59 <span class="sep">·</span> GitHub Actions <span class="sep">·</span> Sentry <span class="sep">·</span> Posthog
+        <span class="mute">Tier gratuito comporta milhares de apostadores.</span>
+      </div>
+    </div>
+
+    <!-- BANCO -->
+    <div class="sub-block">
+      <div class="sub-head reveal">
+        <h3>Modelo de dados</h3>
+        <span class="meta">8 tabelas · PostgreSQL · RLS</span>
+      </div>
+      <div class="schema">
+        <div class="schema-table reveal"><h4>users</h4><p><span class="pk">id</span>, google_id, name, email, avatar_url, role, created_at</p></div>
+        <div class="schema-table reveal"><h4>teams</h4><p><span class="pk">id</span>, code, name, flag_emoji, group_id</p></div>
+        <div class="schema-table reveal"><h4>groups</h4><p><span class="pk">id</span>, code, name, order</p></div>
+        <div class="schema-table reveal"><h4>matches</h4><p><span class="pk">id</span>, group_id, home_team_id, away_team_id, kickoff_at, home_score, away_score, status</p></div>
+        <div class="schema-table reveal"><h4>predictions</h4><p><span class="pk">id</span>, user_id, match_id, home_score, away_score, points <span class="note">— UNIQUE(user_id, match_id)</span></p></div>
+        <div class="schema-table reveal"><h4>payments</h4><p><span class="pk">id</span>, user_id, amount_cents, status, user_confirmed_at, approved_at, approved_by, denied_reason</p></div>
+        <div class="schema-table reveal"><h4>rankings</h4><p><span class="note">view</span> · user_id, total_points, exact_hits, partial_hits, position, last_movement</p></div>
+        <div class="schema-table reveal"><h4>admin_logs</h4><p><span class="pk">id</span>, admin_id, action, target_type, target_id, payload, ip, created_at <span class="note">— append-only</span></p></div>
+      </div>
+    </div>
+
+    <!-- API -->
+    <div class="sub-block">
+      <div class="sub-head reveal">
+        <h3>API REST</h3>
+        <span class="meta">Route Handlers · Zod · JWT</span>
+      </div>
+      <div class="endpoint-list">
+        <div class="endpoint-row reveal"><div class="top"><span class="verb get">GET</span><span class="path">/api/me</span></div><div class="desc">Usuário logado e status do pagamento</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb get">GET</span><span class="path">/api/groups</span></div><div class="desc">Grupos com seleções e classificação atual</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb get">GET</span><span class="path">/api/matches</span></div><div class="desc">Jogos da fase de grupos com meu palpite</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb post">POST</span><span class="path">/api/predictions</span></div><div class="desc">Upsert de palpite — bloqueia após cutoff</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb post">POST</span><span class="path">/api/payments/confirm</span></div><div class="desc">Usuário confirma Pix — notifica admin</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb get">GET</span><span class="path">/api/ranking</span></div><div class="desc">Ranking geral, paginado</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb put">PUT</span><span class="path">/api/admin/payments/:id/approve</span></div><div class="desc">Aprova Pix, dispara e-mail</div></div>
+        <div class="endpoint-row reveal"><div class="top"><span class="verb put">PUT</span><span class="path">/api/admin/matches/:id/result</span></div><div class="desc">Insere placar oficial, recalcula pontos</div></div>
+      </div>
+    </div>
+
+    <!-- SEGURANÇA -->
+    <div class="sub-block">
+      <div class="sub-head reveal">
+        <h3>Segurança</h3>
+        <span class="meta">6 camadas · defesa em profundidade</span>
+      </div>
+      <div class="security reveal">
+        <div class="sec"><div class="n">01 / Auth</div><h5>JWT + RLS</h5><p>Sessão Supabase com refresh. Mesmo bypass da API respeita policies.</p></div>
+        <div class="sec"><div class="n">02 / Input</div><h5>Validação Zod</h5><p>Toda entrada de API validada antes de tocar no banco.</p></div>
+        <div class="sec"><div class="n">03 / Tempo</div><h5>Cutoff server-side</h5><p>Servidor checa o relógio. Manipular o cliente é inútil.</p></div>
+        <div class="sec"><div class="n">04 / Tráfego</div><h5>Rate limit</h5><p>10 req/s no palpite, 3 req/s no resto. Vercel KV.</p></div>
+        <div class="sec"><div class="n">05 / Ranking</div><h5>Pagamento gated</h5><p>Só pagamento aprovado entra. Sem aprovação, palpite é fantasma.</p></div>
+        <div class="sec"><div class="n">06 / Auditoria</div><h5>Logs append-only</h5><p>Toda ação admin registrada com IP. Sem UPDATE/DELETE.</p></div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     CALENDÁRIO
+     ============================================================ -->
+<section id="calendario">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2 class="section-title"><span class="arrow">►</span> O <span class="serif">calendário</span></h2>
+      <div class="section-meta">
+        <div>5 sprints · 5 semanas</div>
+        <div>Lançamento <span class="accent">20.05.2026</span></div>
+      </div>
+    </div>
+
+    <div class="timeline">
+      <div class="sprint reveal">
+        <div class="sprint-week"><span>Semana 1</span><span class="n">01</span></div>
+        <div class="sprint-name">Fundação</div>
+        <ul>
+          <li>Repo + deploy</li>
+          <li>Schema + RLS</li>
+          <li>OAuth Google</li>
+          <li>Seeds: 48 seleções</li>
+        </ul>
+      </div>
+      <div class="sprint reveal delay-1">
+        <div class="sprint-week"><span>Semana 2</span><span class="n">02</span></div>
+        <div class="sprint-name">Core</div>
+        <ul>
+          <li>Dashboard 12 grupos</li>
+          <li>Palpite com upsert</li>
+          <li>Tabela ao vivo</li>
+          <li>Mobile responsivo</li>
+        </ul>
+      </div>
+      <div class="sprint reveal delay-2">
+        <div class="sprint-week"><span>Semana 3</span><span class="n">03</span></div>
+        <div class="sprint-name">Pix & Admin</div>
+        <ul>
+          <li>QR + chave + checkbox</li>
+          <li>Painel de aprovação</li>
+          <li>Cutoff automático</li>
+          <li>Logs de auditoria</li>
+        </ul>
+      </div>
+      <div class="sprint reveal delay-3">
+        <div class="sprint-week"><span>Semana 4</span><span class="n">04</span></div>
+        <div class="sprint-name">Ranking</div>
+        <ul>
+          <li>View de pontos</li>
+          <li>E-mail diário 23:59</li>
+          <li>Cálculo de prêmio</li>
+          <li>Beta fechado</li>
+        </ul>
+      </div>
+      <div class="sprint launch reveal delay-3">
+        <div class="sprint-week"><span>Semana 5</span><span class="n">05</span></div>
+        <div class="sprint-name">Lançamento</div>
+        <ul>
+          <li>Auditoria de segurança</li>
+          <li>Landing de marketing</li>
+          <li>Beta aberto</li>
+          <li>Produção pública</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="deadline reveal">
+      <div class="deadline-date">20.05.26</div>
+      <div class="deadline-text">
+        <strong>Lançamento público</strong>
+        Vinte e dois dias antes do apito inicial em <span class="accent">11 de junho</span>. Tempo para o boca a boca encher o pool antes do primeiro jogo.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COLABORE / CTA FINAL
+     ============================================================ -->
+<section class="colabore" id="colabore">
+  <div class="container">
+    <div class="colabore-grid">
+      <div>
+        <h2><span class="arrow">►</span> Pronto pra entrar no bolão?</h2>
+        <p>Login com Google em um clique. R$ 50 via Pix. 4 minutos até a primeira aposta. Sem senha, sem formulário, sem complicação. <strong style="color: var(--yellow); font-style: normal;">A Copa começa em 11 de junho.</strong></p>
+      </div>
+      <div class="colabore-cta">
+        <a href="/login" class="login-cta">
+          <span class="g">G</span>
+          Entrar com Google
+          <span>→</span>
+        </a>
+        <div class="colabore-fineprint">
+          Aposta única <strong>R$ 50</strong> · Premiação <strong>70/20/10</strong> + reembolso
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+     ============================================================ -->
+<footer>
+  <div class="container">
+    <div class="colofon-grid">
+      <div class="colofon-mark">
+        Bolão <span class="accent">26</span><span class="ball">⚽</span>
+      </div>
+      <div class="colofon-block">
+        <div><strong>Documento</strong></div>
+        <div>Especificação <span class="accent">v1.0</span></div>
+        <div>Maio · 2026</div>
+        <div>Davidson · Empresta</div>
+      </div>
+      <div class="colofon-block right">
+        <div><strong>Próximo passo</strong></div>
+        <div>Aprovar escopo</div>
+        <div>Kick-off Fase 0</div>
+        <div><span class="accent">→ Repo + Schema</span></div>
+      </div>
+    </div>
+    <div class="copyright">
+      Bolão 26 · Inspirado no espírito Bola na Área · Feito por Davidson Almeida em Maio de 2026 · Não afiliado à FIFA
+    </div>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  document.querySelectorAll('.match-input').forEach(input => {
+    input.addEventListener('click', () => input.classList.toggle('active'));
+  });
+</script>
+</body>
+</html>
