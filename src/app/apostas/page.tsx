@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Group, Match, MatchView, Prediction, Team } from "@/lib/types";
+import type { Group, Match, MatchView, Prediction, RankingRow, Team } from "@/lib/types";
 import ApostasClient from "./ApostasClient";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function ApostasPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/apostas");
 
-  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes] = await Promise.all([
+  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes] = await Promise.all([
     supabase.from("groups").select("*").order("ord", { ascending: true }),
     supabase.from("teams").select("*"),
     supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
@@ -25,6 +25,11 @@ export default async function ApostasPage() {
       .select("status")
       .eq("user_id", user.id)
       .maybeSingle(),
+    supabase
+      .from("rankings")
+      .select("*")
+      .order("position", { ascending: true })
+      .limit(200),
   ]);
 
   const groups = (groupsRes.data ?? []) as Group[];
@@ -33,6 +38,7 @@ export default async function ApostasPage() {
   const preds = (predsRes.data ?? []) as Prediction[];
   const paymentStatus =
     (paymentRes.data?.status as "pending" | "approved" | "denied" | undefined) ?? null;
+  const rankings = (rankingsRes.data ?? []) as RankingRow[];
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const predByMatch = new Map(preds.map((p) => [p.match_id, p]));
@@ -47,7 +53,14 @@ export default async function ApostasPage() {
         ...m,
         home,
         away,
-        prediction: p ? { home_score: p.home_score, away_score: p.away_score } : null,
+        prediction: p
+          ? {
+              home_score: p.home_score,
+              away_score: p.away_score,
+              points: p.points,
+              computed_at: p.computed_at,
+            }
+          : null,
       } satisfies MatchView;
     })
     .filter((m): m is MatchView => m !== null);
@@ -66,6 +79,8 @@ export default async function ApostasPage() {
       teams={teams}
       matches={matchViews}
       paymentStatus={paymentStatus}
+      rankings={rankings}
+      currentUserId={user.id}
     />
   );
 }

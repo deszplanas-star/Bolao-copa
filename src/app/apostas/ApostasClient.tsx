@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Group, MatchView, Team } from "@/lib/types";
+import type { Group, MatchView, RankingRow, Team } from "@/lib/types";
 import { computeStandings } from "@/lib/standings";
 import { deletePrediction, upsertPrediction } from "./actions";
 import { submitPayment } from "./payment-actions";
@@ -15,6 +15,8 @@ type Props = {
   teams: Team[];
   matches: MatchView[];
   paymentStatus: "pending" | "approved" | "denied" | null;
+  rankings: RankingRow[];
+  currentUserId: string;
 };
 
 const TABS = [
@@ -57,7 +59,15 @@ function fmtCountdown(iso: string) {
   return `cutoff em ${mins}min`;
 }
 
-export default function ApostasClient({ user, groups, teams, matches, paymentStatus }: Props) {
+export default function ApostasClient({
+  user,
+  groups,
+  teams,
+  matches,
+  paymentStatus,
+  rankings,
+  currentUserId,
+}: Props) {
   const [tab, setTab] = useState<TabKey>("apostas");
   const initialGroup = groups[0]?.code ?? "A";
   const [currentGroup, setCurrentGroup] = useState<string>(initialGroup);
@@ -480,35 +490,10 @@ export default function ApostasClient({ user, groups, teams, matches, paymentSta
         )}
 
         {tab === "ranking" && (
-          <EmptyTab
-            title={
-              <>
-                Ranking <span className="text-green">geral</span> aguardando
-              </>
-            }
-            text="O ranking só começa a se mover depois do primeiro resultado oficial. Por enquanto, foque em preencher seus 72 palpites para garantir a pontuação máxima possível."
-          />
+          <RankingTab rankings={rankings} currentUserId={currentUserId} />
         )}
-        {tab === "resultados" && (
-          <EmptyTab
-            title={
-              <>
-                Aguardando o <span className="text-green">apito inicial</span>
-              </>
-            }
-            text="Os resultados oficiais aparecem aqui conforme os jogos vão acabando. Sua pontuação é calculada automaticamente sobre cada placar inserido pelo administrador. Estreia em 11.06.2026."
-          />
-        )}
-        {tab === "minhas" && (
-          <EmptyTab
-            title={
-              <>
-                Suas <span className="text-green">apostas</span>
-              </>
-            }
-            text="Visão consolidada de todos os seus palpites com pontuação ganha jogo a jogo. Disponível após o primeiro resultado oficial ser inserido pelo admin."
-          />
-        )}
+        {tab === "resultados" && <ResultadosTab matches={matches} />}
+        {tab === "minhas" && <MinhasApostasTab matches={matches} />}
       </main>
 
       {/* STICKY FOOT CTA */}
@@ -738,6 +723,368 @@ function EmptyTab({ title, text }: { title: React.ReactNode; text: string }) {
         {title}
       </h2>
       <p className="font-serif italic text-soft leading-relaxed">{text}</p>
+    </div>
+  );
+}
+
+function RankingTab({
+  rankings,
+  currentUserId,
+}: {
+  rankings: RankingRow[];
+  currentUserId: string;
+}) {
+  if (rankings.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Ranking <span className="text-green">geral</span> aguardando
+          </>
+        }
+        text="O ranking aparece aqui quando o admin lançar o primeiro resultado oficial. Só apostas com Pix aprovado entram na disputa."
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          Ranking <span className="text-green">geral</span>
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {rankings.length} {rankings.length === 1 ? "participante" : "participantes"}
+        </span>
+      </div>
+
+      <div className="border-2 border-ink">
+        <table className="w-full border-collapse">
+          <thead className="bg-ink text-paper">
+            <tr>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-12">
+                #
+              </th>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">
+                Jogador
+              </th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
+                Exatos
+              </th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
+                Parciais
+              </th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
+                Pts
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rankings.map((r) => {
+              const isMe = r.user_id === currentUserId;
+              return (
+                <tr
+                  key={r.user_id}
+                  className={[
+                    "border-b border-rule last:border-b-0",
+                    isMe ? "bg-green/10" : "",
+                  ].join(" ")}
+                >
+                  <td className="py-3 px-3 font-anton text-base">
+                    <span
+                      className={
+                        r.position <= 3 ? "text-green" : "text-mute"
+                      }
+                    >
+                      {r.position}º
+                    </span>
+                  </td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2.5">
+                      {r.avatar_url ? (
+                        <img
+                          src={r.avatar_url}
+                          alt=""
+                          className="w-6 h-6 rounded-full border border-rule object-cover"
+                        />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute">
+                          {(r.name ?? "?").slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="font-anton uppercase tracking-tight text-sm text-ink">
+                        {r.name ?? "Sem nome"}
+                        {isMe && (
+                          <span className="ml-2 font-mono text-[9px] tracking-widest text-green">
+                            VOCÊ
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-sm text-soft">
+                    {r.exact_hits}
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono text-sm text-soft">
+                    {r.partial_hits}
+                  </td>
+                  <td className="py-3 px-3 text-right font-anton text-lg text-ink">
+                    {r.total_points}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-4 font-serif italic text-xs text-soft">
+        Pontuação: <b className="text-green">+3</b> placar exato ·{" "}
+        <b className="text-green">+1</b> vencedor/empate ·{" "}
+        <b className="text-mute">0</b> errou.
+      </p>
+    </div>
+  );
+}
+
+function ResultadosTab({ matches }: { matches: MatchView[] }) {
+  const finished = matches.filter(
+    (m) => m.status === "finished" && m.home_score !== null && m.away_score !== null,
+  );
+
+  if (finished.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Aguardando o <span className="text-green">apito inicial</span>
+          </>
+        }
+        text="Os resultados oficiais aparecem aqui conforme os jogos vão acabando. Sua pontuação é calculada automaticamente sobre cada placar inserido pelo admin."
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          <span className="text-green">Resultados</span> oficiais
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {finished.length} {finished.length === 1 ? "jogo encerrado" : "jogos encerrados"}
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {finished.map((m) => {
+          const hit = m.prediction
+            ? m.prediction.points === 3
+              ? "exact"
+              : m.prediction.points === 1
+                ? "partial"
+                : "miss"
+            : "none";
+          return (
+            <div
+              key={m.id}
+              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src={flagUrl(m.home.iso_code, 80)}
+                  alt=""
+                  className="w-9 h-6 object-cover border border-rule flex-shrink-0"
+                />
+                <span className="font-anton uppercase tracking-tight text-base truncate">
+                  {m.home.name}
+                </span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="font-anton text-2xl text-ink">
+                  {m.home_score} <span className="text-mute text-base mx-1">×</span>{" "}
+                  {m.away_score}
+                </div>
+                <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                  {fmtKickoff(m.kickoff_at)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 justify-end min-w-0">
+                <span className="font-anton uppercase tracking-tight text-base truncate text-right">
+                  {m.away.name}
+                </span>
+                <img
+                  src={flagUrl(m.away.iso_code, 80)}
+                  alt=""
+                  className="w-9 h-6 object-cover border border-rule flex-shrink-0"
+                />
+              </div>
+              {m.prediction && (
+                <div className="col-span-3 pt-3 mt-1 border-t border-rule flex items-center justify-between font-mono text-[11px] uppercase tracking-widest">
+                  <span className="text-mute">
+                    seu palpite{" "}
+                    <b className="text-ink ml-1">
+                      {m.prediction.home_score} × {m.prediction.away_score}
+                    </b>
+                  </span>
+                  <span
+                    className={[
+                      "px-2 py-1 font-anton text-[10px]",
+                      hit === "exact"
+                        ? "bg-green text-paper"
+                        : hit === "partial"
+                          ? "bg-yellow text-ink"
+                          : "bg-paper2 text-mute",
+                    ].join(" ")}
+                  >
+                    {hit === "exact"
+                      ? "+3 placar exato"
+                      : hit === "partial"
+                        ? "+1 vencedor"
+                        : "0 errou"}
+                  </span>
+                </div>
+              )}
+              {!m.prediction && (
+                <div className="col-span-3 pt-3 mt-1 border-t border-rule font-mono text-[10px] uppercase tracking-widest text-mute">
+                  você não palpitou neste jogo
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MinhasApostasTab({ matches }: { matches: MatchView[] }) {
+  const withPrediction = matches.filter((m) => m.prediction !== null);
+  const totalPoints = withPrediction.reduce(
+    (s, m) => s + (m.prediction?.points ?? 0),
+    0,
+  );
+  const resolved = withPrediction.filter((m) => m.prediction?.computed_at);
+  const exactHits = resolved.filter((m) => m.prediction?.points === 3).length;
+  const partialHits = resolved.filter((m) => m.prediction?.points === 1).length;
+
+  if (withPrediction.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Sem <span className="text-green">apostas</span> ainda
+          </>
+        }
+        text="Volte na aba Apostas e preencha seus palpites jogo a jogo. Eles ficam salvos automaticamente."
+      />
+    );
+  }
+
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          Minhas <span className="text-green">apostas</span>
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {withPrediction.length}/{matches.length} palpites
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <Stat label="Pontos" value={totalPoints} accent />
+        <Stat label="Apurados" value={resolved.length} />
+        <Stat label="Exatos" value={exactHits} />
+        <Stat label="Parciais" value={partialHits} />
+      </div>
+
+      <div className="space-y-2">
+        {withPrediction.map((m) => {
+          const computed = !!m.prediction?.computed_at;
+          const pts = m.prediction?.points ?? 0;
+          return (
+            <div
+              key={m.id}
+              className="border border-rule bg-paper p-3 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <img
+                  src={flagUrl(m.home.iso_code, 80)}
+                  alt=""
+                  className="w-7 h-5 object-cover border border-rule flex-shrink-0"
+                />
+                <span className="font-anton uppercase tracking-tight text-sm truncate">
+                  {m.home.name}
+                </span>
+              </div>
+              <div className="font-anton text-lg text-ink whitespace-nowrap">
+                {m.prediction?.home_score} <span className="text-mute mx-0.5">×</span>{" "}
+                {m.prediction?.away_score}
+              </div>
+              <div className="flex items-center gap-2 justify-end min-w-0">
+                <span className="font-anton uppercase tracking-tight text-sm truncate text-right">
+                  {m.away.name}
+                </span>
+                <img
+                  src={flagUrl(m.away.iso_code, 80)}
+                  alt=""
+                  className="w-7 h-5 object-cover border border-rule flex-shrink-0"
+                />
+              </div>
+              <div className="text-right min-w-[80px]">
+                {computed ? (
+                  <span
+                    className={[
+                      "inline-block px-2 py-1 font-anton text-[11px] uppercase tracking-wider",
+                      pts === 3
+                        ? "bg-green text-paper"
+                        : pts === 1
+                          ? "bg-yellow text-ink"
+                          : "bg-paper2 text-mute",
+                    ].join(" ")}
+                  >
+                    +{pts} pt{pts !== 1 ? "s" : ""}
+                  </span>
+                ) : (
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                    {fmtKickoff(m.kickoff_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "border-2 p-3",
+        accent ? "border-ink bg-ink text-paper" : "border-rule bg-paper",
+      ].join(" ")}
+    >
+      <div
+        className={[
+          "font-mono text-[10px] uppercase tracking-widest mb-1",
+          accent ? "text-green" : "text-mute",
+        ].join(" ")}
+      >
+        {label}
+      </div>
+      <div className="font-anton text-3xl leading-none">{value}</div>
     </div>
   );
 }

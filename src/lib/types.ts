@@ -42,5 +42,22 @@ export type GroupWithTeams = Group & { teams: Team[] };
 export type MatchView = Match & {
   home: Team;
   away: Team;
-  prediction: { home_score: number; away_score: number } | null;
+  prediction: {
+    home_score: number;
+    away_score: number;
+    points: number;
+    computed_at: string | null;
+  } | null;
+};
+
+export type RankingRow = {
+  user_id: string;
+  name: string | null;
+  avatar_url: string | null;
+  total_points: number;
+  exact_hits: number;
+  partial_hits: number;
+  misses: number;
+  resolved_count: number;
+  position: number;
 };
