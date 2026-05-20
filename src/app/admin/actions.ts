@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedAdmin } from "@/lib/auth";
@@ -75,21 +76,25 @@ export async function approvePayment(input: unknown): Promise<ActionResult> {
 
   await logAdmin(admin.id, "payment.approve", "payment", parsed.data.payment_id);
 
-  // Notifica o apostador com PDF anexo
-  try {
-    const targetUserId = paymentRow?.user_id as string | undefined;
-    if (targetUserId) {
-      const pdf = await buildUserBetsPdf(targetUserId);
-      if (pdf) {
-        await sendUserApprovalNotification({
-          user_name: pdf.name,
-          user_email: pdf.email,
-          pdfBytes: pdf.bytes,
-        });
-      }
-    }
-  } catch (e) {
-    console.error("[approvePayment] notificação user falhou", e);
+  // Notifica o apostador em background — não bloqueia resposta admin
+  const targetUserId = paymentRow?.user_id as string | undefined;
+  if (targetUserId) {
+    waitUntil(
+      (async () => {
+        try {
+          const pdf = await buildUserBetsPdf(targetUserId);
+          if (pdf) {
+            await sendUserApprovalNotification({
+              user_name: pdf.name,
+              user_email: pdf.email,
+              pdfBytes: pdf.bytes,
+            });
+          }
+        } catch (e) {
+          console.error("[approvePayment] notificação user falhou", e);
+        }
+      })(),
+    );
   }
 
   revalidatePath("/admin");

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { waitUntil } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
 import { buildUserBetsPdf } from "@/lib/bets-pdf";
 import { sendAdminPixNotification } from "@/lib/email";
@@ -66,25 +67,32 @@ export async function submitPayment(formData: FormData): Promise<ActionResult> {
 
   // Lê o arquivo do comprovante como Buffer
   const receiptBuffer = Buffer.from(await receipt.arrayBuffer());
+  const receiptName = receipt.name || "comprovante";
+  const receiptType = receipt.type;
 
-  // Notifica admin com PDF das apostas + comprovante de pagamento
-  try {
-    const pdf = await buildUserBetsPdf(user.id);
-    if (pdf) {
-      await sendAdminPixNotification({
-        user_name: pdf.name,
-        user_email: pdf.email,
-        pdfBytes: pdf.bytes,
-        receipt: {
-          buffer: receiptBuffer,
-          filename: receipt.name || "comprovante",
-          contentType: receipt.type,
-        },
-      });
-    }
-  } catch (e) {
-    console.error("[submitPayment] notificação admin falhou", e);
-  }
+  // Notifica admin em background — não bloqueia a resposta pro cliente.
+  // waitUntil mantém a função serverless viva até o email completar.
+  waitUntil(
+    (async () => {
+      try {
+        const pdf = await buildUserBetsPdf(user.id);
+        if (pdf) {
+          await sendAdminPixNotification({
+            user_name: pdf.name,
+            user_email: pdf.email,
+            pdfBytes: pdf.bytes,
+            receipt: {
+              buffer: receiptBuffer,
+              filename: receiptName,
+              contentType: receiptType,
+            },
+          });
+        }
+      } catch (e) {
+        console.error("[submitPayment] notificação admin falhou", e);
+      }
+    })(),
+  );
 
   revalidatePath("/apostas");
   return { ok: true };
