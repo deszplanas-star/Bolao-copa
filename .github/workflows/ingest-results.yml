@@ -1,0 +1,27 @@
+name: Ingest WC results
+
+# A cada ~5 min (o GitHub pode atrasar alguns minutos) durante a Copa.
+# O próprio script sai cedo se estiver fora da janela do torneio.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {} # permite rodar manualmente pra testar
+
+concurrency:
+  group: ingest-results
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ingerir resultados
+        run: node scripts/ingest-results.mjs
+        env:
+          FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
