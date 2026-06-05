@@ -6,6 +6,8 @@ import {
   approvePayment,
   clearMatchResult,
   denyPayment,
+  notifyCzechFix,
+  resendApprovedPdfs,
   setMatchResult,
 } from "./actions";
 
@@ -33,6 +35,7 @@ type Props = {
 const TABS = [
   { key: "pagamentos", label: "Pagamentos" },
   { key: "resultados", label: "Resultados" },
+  { key: "comunicacao", label: "Comunicação" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -117,7 +120,9 @@ export default function AdminClient({ admin, payments, groups, matches }: Props)
               >
                 {t.key === "pagamentos"
                   ? `${counts.pending} pend.`
-                  : `${counts.finished}/${counts.total}`}
+                  : t.key === "resultados"
+                    ? `${counts.finished}/${counts.total}`
+                    : `${counts.approved} aprov.`}
               </span>
             </button>
           ))}
@@ -148,6 +153,9 @@ export default function AdminClient({ admin, payments, groups, matches }: Props)
             setGroupFilter={setGroupFilter}
             onToast={setToast}
           />
+        )}
+        {tab === "comunicacao" && (
+          <ComunicacaoTab approvedCount={counts.approved} onToast={setToast} />
         )}
       </main>
 
@@ -602,6 +610,144 @@ function ResultRow({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// COMUNICAÇÃO (disparos em massa)
+// ============================================================
+
+function ComunicacaoTab({
+  approvedCount,
+  onToast,
+}: {
+  approvedCount: number;
+  onToast: (msg: string) => void;
+}) {
+  const [pending, startTransition] = useTransition();
+  const [confirm, setConfirm] = useState<null | "pdf" | "czech">(null);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+
+  function run(kind: "pdf" | "czech") {
+    startTransition(async () => {
+      const res =
+        kind === "pdf" ? await resendApprovedPdfs() : await notifyCzechFix();
+      setConfirm(null);
+      if (!res.ok) {
+        onToast(res.error);
+        return;
+      }
+      const msg =
+        `${res.sent} enviado(s)` +
+        (res.failed ? ` · ${res.failed} falha(s)` : "") +
+        ` de ${res.total}`;
+      setLastResult(msg);
+      onToast(`Concluído — ${msg}`);
+    });
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="font-anton text-4xl uppercase tracking-tight text-ink">
+          <span className="text-yellow">►</span> Comunicação
+        </h1>
+        <p className="font-serif italic text-soft mt-1 text-sm">
+          Disparos de email em massa. Cada clique envia de verdade — confirme antes.
+        </p>
+      </div>
+
+      {lastResult && (
+        <div className="mb-6 border-l-4 border-green bg-green/10 px-4 py-3 font-mono text-[12px] uppercase tracking-widest text-ink">
+          Último disparo: {lastResult}
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Reenviar PDFs */}
+        <div className="border-2 border-ink p-5 flex flex-col">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Reenviar PDF aos aprovados
+          </div>
+          <p className="font-serif italic text-sm text-soft flex-1">
+            Reenvia o PDF de confirmação para todos os apostadores com pagamento
+            aprovado. Use pra cobrir quem não recebeu o email de confirmação.
+          </p>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute my-3">
+            Destinatários: <b className="text-ink">{approvedCount}</b> aprovado(s)
+          </div>
+          <button
+            onClick={() => setConfirm("pdf")}
+            disabled={pending || approvedCount === 0}
+            className="px-4 py-2.5 bg-ink text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-ink hover:bg-green hover:border-green disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {pending ? "Processando..." : "Reenviar PDFs"}
+          </button>
+        </div>
+
+        {/* Aviso Dinamarca/Tcheca */}
+        <div className="border-2 border-ink p-5 flex flex-col">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Avisar sobre ajuste do Grupo A
+          </div>
+          <p className="font-serif italic text-sm text-soft flex-1">
+            Envia o email da correção (Dinamarca → República Tcheca) com o link
+            pra revisar o placar, para todos que têm palpite nos jogos reabertos.
+          </p>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute my-3">
+            Destinatários: quem palpitou nos jogos reabertos
+          </div>
+          <button
+            onClick={() => setConfirm("czech")}
+            disabled={pending}
+            className="px-4 py-2.5 bg-ink text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-ink hover:bg-green hover:border-green disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {pending ? "Processando..." : "Enviar aviso"}
+          </button>
+        </div>
+      </div>
+
+      {confirm && (
+        <div
+          className="fixed inset-0 bg-ink/60 z-50 grid place-items-center p-4"
+          onClick={() => !pending && setConfirm(null)}
+        >
+          <div
+            className="bg-paper border-2 border-ink max-w-md w-full"
+            style={{ boxShadow: "8px 8px 0 #002776" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b-2 border-ink">
+              <h3 className="font-anton text-lg uppercase tracking-wider text-ink">
+                Confirmar disparo
+              </h3>
+            </div>
+            <div className="p-5">
+              <p className="font-serif text-sm text-ink mb-4">
+                {confirm === "pdf"
+                  ? `Reenviar o PDF de confirmação para ${approvedCount} apostador(es) aprovado(s)? Eles vão receber o email novamente.`
+                  : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => !pending && setConfirm(null)}
+                  className="px-4 py-2 border border-rule text-soft font-mono text-[11px] uppercase tracking-widest hover:border-ink hover:text-ink"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => run(confirm)}
+                  disabled={pending}
+                  className="px-4 py-2 bg-green text-paper font-anton text-[11px] uppercase tracking-wider border-2 border-green disabled:opacity-50"
+                >
+                  {pending ? "Enviando..." : "Confirmar e enviar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

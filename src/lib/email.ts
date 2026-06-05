@@ -85,11 +85,11 @@ function guessExt(contentType: string, filename: string): string {
   return "";
 }
 
-export async function sendUserApprovalNotification(input: SendInput): Promise<void> {
+export async function sendUserApprovalNotification(input: SendInput): Promise<boolean> {
   const r = client();
   if (!r) {
     console.warn("[email] RESEND_API_KEY ausente — skipping user notification");
-    return;
+    return false;
   }
 
   const subject = `[Bolão 26] Sua participação foi aprovada 🎉`;
@@ -119,8 +119,56 @@ export async function sendUserApprovalNotification(input: SendInput): Promise<vo
         },
       ],
     });
+    return true;
   } catch (e) {
     console.error("[email] sendUserApprovalNotification falhou", e);
+    return false;
+  }
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://bolao-copa-pu3k.vercel.app";
+
+/**
+ * Aviso pros apostadores de que uma seleção do Grupo A foi corrigida
+ * (Dinamarca → República Tcheca) e os jogos dela foram reabertos pra
+ * eles revisarem o placar. Sem anexo — só o link de volta pra plataforma.
+ */
+export async function sendCzechFixNotice(input: {
+  user_name: string;
+  user_email: string;
+}): Promise<boolean> {
+  const r = client();
+  if (!r) {
+    console.warn("[email] RESEND_API_KEY ausente — skipping czech-fix notice");
+    return false;
+  }
+
+  const subject = `[Bolão 26] Ajuste no seu palpite — Grupo A (República Tcheca)`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #009739; margin-bottom: 4px;">Precisamos de um ajuste rápido no seu bolão</h2>
+      <p style="color: #5a6a85; margin-top: 0;">Olá, ${escapeHtml(input.user_name.split(" ")[0])}.</p>
+      <p>Tivemos um erro de cadastro no <strong>Grupo A</strong>: a seleção que aparecia como
+      <strong>Dinamarca</strong> na verdade é a <strong>República Tcheca</strong> — a Dinamarca
+      não está nesse grupo.</p>
+      <p>Como isso muda o adversário em alguns jogos, <strong>reabrimos esses jogos só pra você
+      revisar o placar</strong>, mesmo com a aposta já confirmada.</p>
+      <hr style="border: none; border-top: 1px solid #d2dae5; margin: 16px 0;" />
+      <p style="color: #5a6a85;"><strong>O que fazer:</strong> entre na plataforma, vá no Grupo A,
+      confira/ajuste o placar dos jogos marcados como reabertos e clique em
+      <strong style="color:#009739;">Enviar atualizado</strong>. Não precisa reenviar comprovante —
+      os demais palpites continuam do jeito que você deixou.</p>
+      <a href="${APP_URL}/apostas" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;margin-top:8px;">Revisar meu palpite →</a>
+      <p style="color: #8092ab; font-size: 12px; margin-top: 16px;">Se você concordar com o placar que já estava, é só reenviar do mesmo jeito. Qualquer dúvida, responda este email.</p>
+    </div>
+  `;
+
+  try {
+    await r.emails.send({ from: fromEmail, to: [input.user_email], subject, html });
+    return true;
+  } catch (e) {
+    console.error("[email] sendCzechFixNotice falhou", e);
+    return false;
   }
 }
 

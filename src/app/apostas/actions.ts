@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { isReopenWindowOpen } from "@/lib/reopen";
 
 const CUTOFF_MS = 5 * 60 * 1000;
 
@@ -68,8 +69,10 @@ export async function upsertPrediction(input: unknown): Promise<ActionResult> {
   const { supabase, user, match } = got;
 
   // Quem já selou a aposta só pode editar jogos explicitamente reabertos
-  // pelo admin (ex.: correção de seleção). Os demais seguem travados.
-  if (!match.reopened && (await isBetSealed(supabase, user.id))) {
+  // pelo admin (ex.: correção de seleção) — e só enquanto a janela de
+  // reedição estiver aberta (fecha antes da Copa). Os demais seguem travados.
+  const reopenAllowed = match.reopened && isReopenWindowOpen();
+  if (!reopenAllowed && (await isBetSealed(supabase, user.id))) {
     return { ok: false, error: "Aposta já foi ativada — palpites travados." };
   }
 

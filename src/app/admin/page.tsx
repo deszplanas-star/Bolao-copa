@@ -5,6 +5,7 @@ import type { Group, Match, Team } from "@/lib/types";
 import AdminClient from "./AdminClient";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 type PaymentRow = {
   id: string;

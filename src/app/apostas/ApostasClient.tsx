@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group, MatchView, RankingRow, Team } from "@/lib/types";
 import { computeStandings } from "@/lib/standings";
+import { isReopenWindowOpen } from "@/lib/reopen";
 import { deletePrediction, upsertPrediction } from "./actions";
 import { submitPayment } from "./payment-actions";
 
@@ -95,6 +96,9 @@ export default function ApostasClient({
     () => matches.reduce((s, m) => (m.reopened ? s + 1 : s), 0),
     [matches],
   );
+  // Janela de reedição (fecha automaticamente antes da Copa). Reavalia a
+  // cada tick de `now`, então a tela se trava sozinha quando o prazo passa.
+  const reopenWindowOpen = isReopenWindowOpen(now);
 
   // Tick a cada minuto pra atualizar countdowns
   useEffect(() => {
@@ -429,7 +433,7 @@ export default function ApostasClient({
             </div>
           </div>
         )}
-        {tab === "apostas" && sealed && reopenedCount > 0 && (
+        {tab === "apostas" && sealed && reopenedCount > 0 && reopenWindowOpen && (
           <div className="max-w-[1280px] mx-auto px-8 pt-4">
             <div className="border-l-4 border-green bg-green/10 px-5 py-4">
               <div className="font-anton uppercase tracking-wider text-sm text-ink">
@@ -457,7 +461,7 @@ export default function ApostasClient({
                   index={idx}
                   now={now}
                   sealed={sealed}
-                  reopenMode={sealed && m.reopened}
+                  reopenMode={sealed && m.reopened && reopenWindowOpen}
                   reopenSaving={!!reopenSaving[m.id]}
                   onChange={updateScore}
                   onLocalChange={updateScoreLocal}
@@ -728,11 +732,6 @@ function MatchRow({
   // Editável se ainda não travou no tempo E (não está selado OU foi reaberto).
   const locked = timeLocked || (sealed && !reopenMode);
   const reopenEditable = reopenMode && !timeLocked;
-  // Houve mudança em relação ao palpite já salvo?
-  const changed = match.prediction
-    ? parseScore(home) !== match.prediction.home_score ||
-      parseScore(away) !== match.prediction.away_score
-    : filled;
 
   const countdown = !locked ? fmtCountdown(match.kickoff_at) : null;
   const showCountdown = countdown && new Date(match.kickoff_at).getTime() - now < 24 * 3600 * 1000;
@@ -840,10 +839,10 @@ function MatchRow({
         <div className="mt-3 pt-3 border-t border-rule flex justify-end">
           <button
             onClick={() => onSubmitReopen(match.id)}
-            disabled={!filled || !changed || reopenSaving}
+            disabled={!filled || reopenSaving}
             className={[
               "px-4 py-2 font-anton text-[13px] uppercase tracking-wider border-2 transition-colors",
-              !filled || !changed || reopenSaving
+              !filled || reopenSaving
                 ? "bg-paper2 text-mute border-rule cursor-not-allowed"
                 : "bg-green text-paper border-green hover:bg-green2 hover:border-green2 cursor-pointer",
             ].join(" ")}
