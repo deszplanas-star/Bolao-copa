@@ -17,7 +17,7 @@ const deleteSchema = z.object({
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
-type MatchLockInfo = { id: string; status: string; kickoff_at: string };
+type MatchLockInfo = { id: string; status: string; kickoff_at: string; reopened: boolean };
 type SupabaseClient = ReturnType<typeof createClient>;
 type AuthedUser = { id: string };
 type GetMatchResult =
@@ -33,7 +33,7 @@ async function getUserAndMatch(matchId: string): Promise<GetMatchResult> {
 
   const { data, error: mErr } = await supabase
     .from("matches")
-    .select("id, status, kickoff_at")
+    .select("id, status, kickoff_at, reopened")
     .eq("id", matchId)
     .single();
   if (mErr || !data) return { ok: false, error: "Jogo não encontrado." };
@@ -67,7 +67,9 @@ export async function upsertPrediction(input: unknown): Promise<ActionResult> {
   if (!got.ok) return { ok: false, error: got.error };
   const { supabase, user, match } = got;
 
-  if (await isBetSealed(supabase, user.id)) {
+  // Quem já selou a aposta só pode editar jogos explicitamente reabertos
+  // pelo admin (ex.: correção de seleção). Os demais seguem travados.
+  if (!match.reopened && (await isBetSealed(supabase, user.id))) {
     return { ok: false, error: "Aposta já foi ativada — palpites travados." };
   }
 

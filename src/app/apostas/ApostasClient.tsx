@@ -88,7 +88,13 @@ export default function ApostasClient({
   const [showPixModal, setShowPixModal] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [reopenSaving, setReopenSaving] = useState<Record<string, boolean>>({});
   const [now, setNow] = useState(() => Date.now());
+
+  const reopenedCount = useMemo(
+    () => matches.reduce((s, m) => (m.reopened ? s + 1 : s), 0),
+    [matches],
+  );
 
   // Tick a cada minuto pra atualizar countdowns
   useEffect(() => {
@@ -230,6 +236,40 @@ export default function ApostasClient({
     const nextAway = side === "away" ? cleaned : cur.away;
     persist(matchId, nextHome, nextAway);
   }
+
+  // ===== Reedição de jogo reaberto (aposta já selada) =====
+  // Diferente do fluxo normal: NÃO salva a cada tecla. A pessoa digita e
+  // confirma no botão "Enviar atualizado". Sem modal de Pix, sem comprovante.
+  function updateScoreLocal(matchId: string, side: "home" | "away", raw: string) {
+    const cleaned = raw.replace(/\D/g, "").slice(0, 2);
+    setDrafts((prev) => {
+      const next = { ...prev };
+      const cur = next[matchId] ?? { home: "", away: "" };
+      next[matchId] = { ...cur, [side]: cleaned };
+      return next;
+    });
+  }
+
+  const submitReopened = useCallback(
+    async (matchId: string) => {
+      const d = drafts[matchId];
+      const h = parseScore(d?.home ?? "");
+      const a = parseScore(d?.away ?? "");
+      if (h === null || a === null) {
+        setToast("Preencha os dois placares.");
+        return;
+      }
+      setReopenSaving((p) => ({ ...p, [matchId]: true }));
+      const res = await upsertPrediction({
+        match_id: matchId,
+        home_score: h,
+        away_score: a,
+      });
+      setReopenSaving((p) => ({ ...p, [matchId]: false }));
+      setToast(res.ok ? "Palpite atualizado" : res.error);
+    },
+    [drafts],
+  );
 
   // ===== Toast auto-hide =====
   useEffect(() => {
@@ -389,6 +429,22 @@ export default function ApostasClient({
             </div>
           </div>
         )}
+        {tab === "apostas" && sealed && reopenedCount > 0 && (
+          <div className="max-w-[1280px] mx-auto px-8 pt-4">
+            <div className="border-l-4 border-green bg-green/10 px-5 py-4">
+              <div className="font-anton uppercase tracking-wider text-sm text-ink">
+                ► {reopenedCount} jogo{reopenedCount > 1 ? "s" : ""} reaberto
+                {reopenedCount > 1 ? "s" : ""} para correção
+              </div>
+              <div className="font-serif italic text-xs text-soft mt-0.5">
+                Corrigimos uma seleção do Grupo A (Dinamarca → República Tcheca).
+                Revise o placar nesses jogos e clique em{" "}
+                <b className="text-green not-italic">Enviar atualizado</b>. Não
+                precisa reenviar comprovante — os demais palpites seguem travados.
+              </div>
+            </div>
+          </div>
+        )}
         {tab === "apostas" && (
           <div className="max-w-[1280px] mx-auto px-8 py-8 grid lg:grid-cols-[1fr_360px] gap-8">
             {/* Matches pane */}
@@ -401,7 +457,11 @@ export default function ApostasClient({
                   index={idx}
                   now={now}
                   sealed={sealed}
+                  reopenMode={sealed && m.reopened}
+                  reopenSaving={!!reopenSaving[m.id]}
                   onChange={updateScore}
+                  onLocalChange={updateScoreLocal}
+                  onSubmitReopen={submitReopened}
                 />
               ))}
               {currentMatches.length === 0 && (
@@ -640,28 +700,48 @@ function MatchRow({
   index,
   now,
   sealed,
+  reopenMode,
+  reopenSaving,
   onChange,
+  onLocalChange,
+  onSubmitReopen,
 }: {
   match: MatchView;
   draft: Draft | undefined;
   index: number;
   now: number;
   sealed: boolean;
+  reopenMode: boolean;
+  reopenSaving: boolean;
   onChange: (matchId: string, side: "home" | "away", val: string) => void;
+  onLocalChange: (matchId: string, side: "home" | "away", val: string) => void;
+  onSubmitReopen: (matchId: string) => void;
 }) {
   const home = draft?.home ?? "";
   const away = draft?.away ?? "";
   const filled = parseScore(home) !== null && parseScore(away) !== null;
 
-  const locked =
-    sealed ||
+  // Trava de tempo (apito) — vale para todos, inclusive jogos reabertos.
+  const timeLocked =
     match.status !== "scheduled" ||
     new Date(match.kickoff_at).getTime() - now <= 5 * 60 * 1000;
+  // Editável se ainda não travou no tempo E (não está selado OU foi reaberto).
+  const locked = timeLocked || (sealed && !reopenMode);
+  const reopenEditable = reopenMode && !timeLocked;
+  // Houve mudança em relação ao palpite já salvo?
+  const changed = match.prediction
+    ? parseScore(home) !== match.prediction.home_score ||
+      parseScore(away) !== match.prediction.away_score
+    : filled;
 
   const countdown = !locked ? fmtCountdown(match.kickoff_at) : null;
   const showCountdown = countdown && new Date(match.kickoff_at).getTime() - now < 24 * 3600 * 1000;
 
-  const status = sealed ? (
+  const status = reopenEditable ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-green">
+      reaberto · atualize o placar
+    </span>
+  ) : sealed ? (
     <span className="font-mono text-[10px] uppercase tracking-widest text-green">
       aposta selada
     </span>
@@ -725,7 +805,9 @@ function MatchRow({
             value={home}
             disabled={locked}
             placeholder="–"
-            onChange={(e) => onChange(match.id, "home", e.target.value)}
+            onChange={(e) =>
+              (reopenMode ? onLocalChange : onChange)(match.id, "home", e.target.value)
+            }
             onFocus={(e) => e.currentTarget.select()}
             className={inputCls}
           />
@@ -736,7 +818,9 @@ function MatchRow({
             value={away}
             disabled={locked}
             placeholder="–"
-            onChange={(e) => onChange(match.id, "away", e.target.value)}
+            onChange={(e) =>
+              (reopenMode ? onLocalChange : onChange)(match.id, "away", e.target.value)
+            }
             onFocus={(e) => e.currentTarget.select()}
             className={inputCls}
           />
@@ -752,6 +836,22 @@ function MatchRow({
           />
         </div>
       </div>
+      {reopenEditable && (
+        <div className="mt-3 pt-3 border-t border-rule flex justify-end">
+          <button
+            onClick={() => onSubmitReopen(match.id)}
+            disabled={!filled || !changed || reopenSaving}
+            className={[
+              "px-4 py-2 font-anton text-[13px] uppercase tracking-wider border-2 transition-colors",
+              !filled || !changed || reopenSaving
+                ? "bg-paper2 text-mute border-rule cursor-not-allowed"
+                : "bg-green text-paper border-green hover:bg-green2 hover:border-green2 cursor-pointer",
+            ].join(" ")}
+          >
+            {reopenSaving ? "Enviando..." : "Enviar atualizado"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

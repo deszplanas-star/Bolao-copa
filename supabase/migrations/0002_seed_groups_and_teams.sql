@@ -26,7 +26,7 @@ begin
   select id into g_id from public.groups where code='A';
   insert into public.teams (iso_code, name, group_id) values
     ('mx', 'México', g_id),
-    ('dk', 'Dinamarca', g_id),
+    ('cz', 'República Tcheca', g_id),
     ('kr', 'Coreia do Sul', g_id),
     ('za', 'África do Sul', g_id);
 
