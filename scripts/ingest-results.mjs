@@ -11,6 +11,16 @@
 //   FOOTBALL_DATA_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // ============================================================
 
+// Janela do torneio PRIMEIRO — fora dela não há o que ingerir, então saímos
+// cedo (e antes de exigir os secrets, pra não falhar à toa antes da Copa).
+const NOW = Date.now();
+const WINDOW_START = Date.parse("2026-06-10T00:00:00Z");
+const WINDOW_END = Date.parse("2026-07-20T23:59:59Z");
+if (NOW < WINDOW_START || NOW > WINDOW_END) {
+  console.log("Fora da janela do torneio — nada a fazer.");
+  process.exit(0);
+}
+
 const FD_TOKEN = process.env.FOOTBALL_DATA_TOKEN;
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,15 +28,6 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!FD_TOKEN || !SB_URL || !SB_KEY) {
   console.error("Faltam env vars (FOOTBALL_DATA_TOKEN / SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
   process.exit(1);
-}
-
-// Janela do torneio — fora dela não há o que ingerir, então saímos cedo.
-const NOW = Date.now();
-const WINDOW_START = Date.parse("2026-06-10T00:00:00Z");
-const WINDOW_END = Date.parse("2026-07-20T23:59:59Z");
-if (NOW < WINDOW_START || NOW > WINDOW_END) {
-  console.log("Fora da janela do torneio — nada a fazer.");
-  process.exit(0);
 }
 
 // Sigla (TLA) da football-data.org → iso_code do nosso banco.

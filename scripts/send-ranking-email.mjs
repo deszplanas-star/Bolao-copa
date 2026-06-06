@@ -10,6 +10,14 @@
 //      RESEND_FROM_EMAIL (opcional), APP_URL (opcional)
 // ============================================================
 
+// Janela do torneio PRIMEIRO — antes da Copa não há ranking pra mandar, então
+// saímos cedo (e antes de exigir os secrets, pra não falhar à toa).
+const NOW = Date.now();
+if (NOW < Date.parse("2026-06-10T00:00:00Z") || NOW > Date.parse("2026-07-21T23:59:59Z")) {
+  console.log("Fora da janela do torneio — sem email do dia.");
+  process.exit(0);
+}
+
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY = process.env.RESEND_API_KEY;
