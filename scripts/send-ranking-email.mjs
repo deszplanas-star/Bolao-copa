@@ -6,9 +6,11 @@
 // no dia (BRT) e dispara por email para todos os participantes
 // (quem está no ranking = pagamento aprovado).
 //
-// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY,
-//      RESEND_FROM_EMAIL (opcional), APP_URL (opcional)
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GMAIL_USER,
+//      GMAIL_APP_PASSWORD, GMAIL_FROM (opcional), APP_URL (opcional)
 // ============================================================
+
+import nodemailer from "nodemailer";
 
 // Janela do torneio PRIMEIRO — antes da Copa não há ranking pra mandar, então
 // saímos cedo (e antes de exigir os secrets, pra não falhar à toa).
@@ -20,12 +22,13 @@ if (NOW < Date.parse("2026-06-10T00:00:00Z") || NOW > Date.parse("2026-07-21T23:
 
 const SB_URL = process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const RESEND_KEY = process.env.RESEND_API_KEY;
-const FROM = process.env.RESEND_FROM_EMAIL || "Bolão 26 <bolao@empresta.com.br>";
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const FROM = process.env.GMAIL_FROM || (GMAIL_USER ? `Bolão 26 <${GMAIL_USER}>` : "Bolão 26");
 const APP_URL = process.env.APP_URL || "https://bolao-copa-pu3k.vercel.app";
 
-if (!SB_URL || !SB_KEY || !RESEND_KEY) {
-  console.error("Faltam env vars (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY)");
+if (!SB_URL || !SB_KEY || !GMAIL_USER || !GMAIL_PASS) {
+  console.error("Faltam env vars (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / GMAIL_USER / GMAIL_APP_PASSWORD)");
   process.exit(1);
 }
 
@@ -129,24 +132,27 @@ async function main() {
     <p style="color:#8092ab;font-size:12px;">Pontuação: +3 placar exato · +1 vencedor/empate · 0 errou.</p>
   </div>`;
 
-  // Dispara em lotes via bcc (até 45 por email) pra economizar chamadas.
+  // Dispara em lotes via bcc (até 45 por email) pelo Gmail SMTP.
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+  });
+
   let sent = 0;
   for (const batch of chunk(recipients, 45)) {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await transporter.sendMail({
         from: FROM,
-        to: [FROM.match(/<(.+)>/)?.[1] || FROM],
+        to: GMAIL_USER,
         bcc: batch,
         subject: `[Bolão 26] Ranking de ${dateLabel} 🏆`,
         html,
-      }),
-    });
-    if (!res.ok) {
-      console.error(`Resend ${res.status}: ${await res.text()}`);
-    } else {
+      });
       sent += batch.length;
+    } catch (e) {
+      console.error("Envio falhou:", e.message);
     }
   }
 

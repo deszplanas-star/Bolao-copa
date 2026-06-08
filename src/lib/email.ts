@@ -1,15 +1,54 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resendKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.RESEND_FROM_EMAIL ?? "Bolão 26 <onboarding@resend.dev>";
+// Envio via Gmail SMTP (sem necessidade de domínio verificado).
+// Configurar no ambiente: GMAIL_USER (ex.: deszplanas@gmail.com) e
+// GMAIL_APP_PASSWORD (Senha de app do Google, 16 caracteres).
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD;
+const fromEmail =
+  process.env.GMAIL_FROM ?? (GMAIL_USER ? `Bolão 26 <${GMAIL_USER}>` : "Bolão 26");
 const adminEmail =
   process.env.ADMIN_NOTIFICATION_EMAIL ??
   process.env.ADMIN_EMAILS?.split(",")[0]?.trim() ??
+  GMAIL_USER ??
   "deszplanas@gmail.com";
 
-function client(): Resend | null {
-  if (!resendKey) return null;
-  return new Resend(resendKey);
+function transport() {
+  if (!GMAIL_USER || !GMAIL_PASS) return null;
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+  });
+}
+
+type Attachment = { filename: string; content: Buffer };
+
+async function send(opts: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: Attachment[];
+}): Promise<boolean> {
+  const t = transport();
+  if (!t) {
+    console.warn("[email] GMAIL_USER/GMAIL_APP_PASSWORD ausentes — skipping");
+    return false;
+  }
+  try {
+    await t.sendMail({
+      from: fromEmail,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      attachments: opts.attachments,
+    });
+    return true;
+  } catch (e) {
+    console.error("[email] envio falhou", e);
+    return false;
+  }
 }
 
 type SendInput = {
@@ -26,13 +65,9 @@ type AdminSendInput = SendInput & {
   };
 };
 
-export async function sendAdminPixNotification(input: AdminSendInput): Promise<void> {
-  const r = client();
-  if (!r) {
-    console.warn("[email] RESEND_API_KEY ausente — skipping admin notification");
-    return;
-  }
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://bolao-copa-pu3k.vercel.app";
 
+export async function sendAdminPixNotification(input: AdminSendInput): Promise<void> {
   const subject = `[Bolão 26] Novo Pix recebido — ${input.user_name}`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
@@ -43,11 +78,11 @@ export async function sendAdminPixNotification(input: AdminSendInput): Promise<v
       <p style="margin: 4px 0;"><strong>Email:</strong> ${escapeHtml(input.user_email)}</p>
       <p style="margin: 4px 0;"><strong>Valor:</strong> R$ ${process.env.NEXT_PUBLIC_PIX_AMOUNT ?? "50"},00</p>
       <p style="margin: 16px 0; color: #5a6a85;">Os 72 palpites estão no PDF anexo. O comprovante de pagamento também segue em anexo para conferência com sua conta.</p>
-      <a href="https://bolao-copa-pu3k.vercel.app/admin" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;">Abrir painel admin →</a>
+      <a href="${APP_URL}/admin" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;">Abrir painel admin →</a>
     </div>
   `;
 
-  const attachments: Array<{ filename: string; content: Buffer }> = [
+  const attachments: Attachment[] = [
     {
       filename: `apostas-${slugify(input.user_name)}.pdf`,
       content: Buffer.from(input.pdfBytes),
@@ -62,17 +97,7 @@ export async function sendAdminPixNotification(input: AdminSendInput): Promise<v
     });
   }
 
-  try {
-    await r.emails.send({
-      from: fromEmail,
-      to: [adminEmail],
-      subject,
-      html,
-      attachments,
-    });
-  } catch (e) {
-    console.error("[email] sendAdminPixNotification falhou", e);
-  }
+  await send({ to: adminEmail, subject, html, attachments });
 }
 
 function guessExt(contentType: string, filename: string): string {
@@ -86,12 +111,6 @@ function guessExt(contentType: string, filename: string): string {
 }
 
 export async function sendUserApprovalNotification(input: SendInput): Promise<boolean> {
-  const r = client();
-  if (!r) {
-    console.warn("[email] RESEND_API_KEY ausente — skipping user notification");
-    return false;
-  }
-
   const subject = `[Bolão 26] Sua participação foi aprovada 🎉`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
@@ -102,31 +121,22 @@ export async function sendUserApprovalNotification(input: SendInput): Promise<bo
       <hr style="border: none; border-top: 1px solid #d2dae5; margin: 16px 0;" />
       <p style="color: #5a6a85;"><strong>Lembrete:</strong> a partir de agora seus palpites estão selados e não podem mais ser editados.</p>
       <p style="color: #5a6a85;">A Copa começa em 11 de junho. Boa sorte!</p>
-      <a href="https://bolao-copa-pu3k.vercel.app/apostas" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;margin-top:8px;">Ver minhas apostas →</a>
+      <a href="${APP_URL}/apostas" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;margin-top:8px;">Ver minhas apostas →</a>
     </div>
   `;
 
-  try {
-    await r.emails.send({
-      from: fromEmail,
-      to: [input.user_email],
-      subject,
-      html,
-      attachments: [
-        {
-          filename: `apostas-${slugify(input.user_name)}.pdf`,
-          content: Buffer.from(input.pdfBytes),
-        },
-      ],
-    });
-    return true;
-  } catch (e) {
-    console.error("[email] sendUserApprovalNotification falhou", e);
-    return false;
-  }
+  return send({
+    to: input.user_email,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `apostas-${slugify(input.user_name)}.pdf`,
+        content: Buffer.from(input.pdfBytes),
+      },
+    ],
+  });
 }
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://bolao-copa-pu3k.vercel.app";
 
 /**
  * Aviso pros apostadores de que uma seleção do Grupo A foi corrigida
@@ -137,12 +147,6 @@ export async function sendCzechFixNotice(input: {
   user_name: string;
   user_email: string;
 }): Promise<boolean> {
-  const r = client();
-  if (!r) {
-    console.warn("[email] RESEND_API_KEY ausente — skipping czech-fix notice");
-    return false;
-  }
-
   const subject = `[Bolão 26] Ajuste no seu palpite — Grupo A (República Tcheca)`;
   const html = `
     <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
@@ -163,13 +167,7 @@ export async function sendCzechFixNotice(input: {
     </div>
   `;
 
-  try {
-    await r.emails.send({ from: fromEmail, to: [input.user_email], subject, html });
-    return true;
-  } catch (e) {
-    console.error("[email] sendCzechFixNotice falhou", e);
-    return false;
-  }
+  return send({ to: input.user_email, subject, html });
 }
 
 function escapeHtml(s: string): string {
