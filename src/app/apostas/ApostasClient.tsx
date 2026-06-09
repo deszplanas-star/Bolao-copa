@@ -18,6 +18,7 @@ type Props = {
   paymentStatus: "pending" | "approved" | "denied" | null;
   rankings: RankingRow[];
   currentUserId: string;
+  editsUnlocked: boolean;
 };
 
 const TABS = [
@@ -68,6 +69,7 @@ export default function ApostasClient({
   paymentStatus,
   rankings,
   currentUserId,
+  editsUnlocked,
 }: Props) {
   const sealed = paymentStatus === "pending" || paymentStatus === "approved";
   const [tab, setTab] = useState<TabKey>("apostas");
@@ -433,6 +435,21 @@ export default function ApostasClient({
             </div>
           </div>
         )}
+        {tab === "apostas" && editsUnlocked && (
+          <div className="max-w-[1280px] mx-auto px-8 pt-4">
+            <div className="border-l-4 border-yellow bg-yellow/10 px-5 py-4">
+              <div className="font-anton uppercase tracking-wider text-sm text-ink">
+                ✎ Edição liberada pra você
+              </div>
+              <div className="font-serif italic text-xs text-soft mt-0.5">
+                O admin reabriu seus palpites pra ajuste. Altere o placar dos jogos que
+                quiser e clique em{" "}
+                <b className="text-green not-italic">Enviar atualizado</b> em cada um.
+                Jogos que já começaram seguem travados.
+              </div>
+            </div>
+          </div>
+        )}
         {tab === "apostas" && sealed && reopenedCount > 0 && reopenWindowOpen && (
           <div className="max-w-[1280px] mx-auto px-8 pt-4">
             <div className="border-l-4 border-green bg-green/10 px-5 py-4">
@@ -461,7 +478,7 @@ export default function ApostasClient({
                   index={idx}
                   now={now}
                   sealed={sealed}
-                  reopenMode={sealed && m.reopened && reopenWindowOpen}
+                  reopenMode={editsUnlocked || (sealed && m.reopened && reopenWindowOpen)}
                   reopenSaving={!!reopenSaving[m.id]}
                   onChange={updateScore}
                   onLocalChange={updateScoreLocal}

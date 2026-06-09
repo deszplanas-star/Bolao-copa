@@ -12,25 +12,29 @@ export default async function ApostasPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/apostas");
 
-  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes] = await Promise.all([
-    supabase.from("groups").select("*").order("ord", { ascending: true }),
-    supabase.from("teams").select("*"),
-    supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
-    supabase
-      .from("predictions")
-      .select("id,user_id,match_id,home_score,away_score,points,computed_at")
-      .eq("user_id", user.id),
-    supabase
-      .from("payments")
-      .select("status")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-    supabase
-      .from("rankings")
-      .select("*")
-      .order("position", { ascending: true })
-      .limit(200),
-  ]);
+  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes, userRowRes] =
+    await Promise.all([
+      supabase.from("groups").select("*").order("ord", { ascending: true }),
+      supabase.from("teams").select("*"),
+      supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
+      supabase
+        .from("predictions")
+        .select("id,user_id,match_id,home_score,away_score,points,computed_at")
+        .eq("user_id", user.id),
+      supabase
+        .from("payments")
+        .select("status")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("rankings")
+        .select("*")
+        .order("position", { ascending: true })
+        .limit(200),
+      // Flag de liberação de edição individual. Defensivo: se a coluna ainda
+      // não existir (deploy antes da migration), o erro é ignorado e cai em false.
+      supabase.from("users").select("edits_unlocked").eq("id", user.id).maybeSingle(),
+    ]);
 
   const groups = (groupsRes.data ?? []) as Group[];
   const teams = (teamsRes.data ?? []) as Team[];
@@ -39,6 +43,7 @@ export default async function ApostasPage() {
   const paymentStatus =
     (paymentRes.data?.status as "pending" | "approved" | "denied" | undefined) ?? null;
   const rankings = (rankingsRes.data ?? []) as RankingRow[];
+  const editsUnlocked = (userRowRes.data?.edits_unlocked as boolean | undefined) ?? false;
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const predByMatch = new Map(preds.map((p) => [p.match_id, p]));
@@ -81,6 +86,7 @@ export default async function ApostasPage() {
       paymentStatus={paymentStatus}
       rankings={rankings}
       currentUserId={user.id}
+      editsUnlocked={editsUnlocked}
     />
   );
 }

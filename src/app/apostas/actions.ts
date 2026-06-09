@@ -55,6 +55,22 @@ async function isBetSealed(
   return status === "pending" || status === "approved";
 }
 
+// Liberação de edição POR USUÁRIO (flag `users.edits_unlocked`), concedida
+// manualmente pelo admin. Quando true, a pessoa pode reeditar os próprios
+// palpites mesmo com a aposta selada/aprovada — independente do pagamento e
+// do mecanismo global de `reopened`. A trava de horário (apito) continua valendo.
+async function isEditsUnlocked(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("users")
+    .select("edits_unlocked")
+    .eq("id", userId)
+    .maybeSingle();
+  return data?.edits_unlocked === true;
+}
+
 function isLocked(status: string, kickoff_at: string) {
   if (status !== "scheduled") return true;
   return new Date(kickoff_at).getTime() - Date.now() <= CUTOFF_MS;
@@ -72,7 +88,8 @@ export async function upsertPrediction(input: unknown): Promise<ActionResult> {
   // pelo admin (ex.: correção de seleção) — e só enquanto a janela de
   // reedição estiver aberta (fecha antes da Copa). Os demais seguem travados.
   const reopenAllowed = match.reopened && isReopenWindowOpen();
-  if (!reopenAllowed && (await isBetSealed(supabase, user.id))) {
+  const unlocked = await isEditsUnlocked(supabase, user.id);
+  if (!reopenAllowed && !unlocked && (await isBetSealed(supabase, user.id))) {
     return { ok: false, error: "Aposta já foi ativada — palpites travados." };
   }
 
