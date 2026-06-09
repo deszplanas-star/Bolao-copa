@@ -6,7 +6,12 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedAdmin } from "@/lib/auth";
 import { buildUserBetsPdf } from "@/lib/bets-pdf";
-import { sendCzechFixNotice, sendTestEmail, sendUserApprovalNotification } from "@/lib/email";
+import {
+  sendCountdownEmail,
+  sendCzechFixNotice,
+  sendTestEmail,
+  sendUserApprovalNotification,
+} from "@/lib/email";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 type BroadcastResult =
@@ -234,6 +239,66 @@ export async function sendAdminTestEmail(): Promise<
 
   if (!res.ok) return { ok: false, error: res.detail };
   return { ok: true, detail: res.detail, to: res.to };
+}
+
+/**
+ * Dispara o email de contagem regressiva (com o PDF dos palpites em anexo)
+ * para TODOS os apostadores com pagamento aprovado. Os dias até a estreia são
+ * calculados no servidor a partir do 1º jogo (kickoff), em horário de Brasília.
+ */
+export async function notifyCountdown(): Promise<BroadcastResult> {
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const supabase = createClient();
+
+  // Dias até a estreia = data do 1º jogo (kickoff) - hoje, em BRT (UTC-3).
+  const { data: firstMatch } = await supabase
+    .from("matches")
+    .select("kickoff_at")
+    .order("kickoff_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  let daysLeft = 0;
+  if (firstMatch?.kickoff_at) {
+    const brtDay = (d: Date) => {
+      const b = new Date(d.getTime() - 3 * 60 * 60 * 1000); // desloca p/ BRT
+      return Date.UTC(b.getUTCFullYear(), b.getUTCMonth(), b.getUTCDate());
+    };
+    const kickoff = new Date(firstMatch.kickoff_at as string);
+    daysLeft = Math.max(0, Math.round((brtDay(kickoff) - brtDay(new Date())) / 86_400_000));
+  }
+
+  const { data: rows, error } = await supabase
+    .from("payments")
+    .select("user_id")
+    .eq("status", "approved");
+
+  if (error) return { ok: false, error: error.message };
+
+  const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id as string)));
+  if (userIds.length === 0) return { ok: true, total: 0, sent: 0, failed: 0 };
+
+  const { sent, failed } = await runInChunks(userIds, 4, async (uid) => {
+    const pdf = await buildUserBetsPdf(uid);
+    if (!pdf) return false;
+    return sendCountdownEmail({
+      user_name: pdf.name,
+      user_email: pdf.email,
+      pdfBytes: pdf.bytes,
+      daysLeft,
+    });
+  });
+
+  await logAdmin(admin.id, "broadcast.countdown", "payment", admin.id, {
+    total: userIds.length,
+    sent,
+    failed,
+    daysLeft,
+  });
+
+  return { ok: true, total: userIds.length, sent, failed };
 }
 
 export async function denyPayment(input: unknown): Promise<ActionResult> {

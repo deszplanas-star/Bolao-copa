@@ -6,6 +6,7 @@ import {
   approvePayment,
   clearMatchResult,
   denyPayment,
+  notifyCountdown,
   notifyCzechFix,
   resendApprovedPdfs,
   sendAdminTestEmail,
@@ -627,7 +628,7 @@ function ComunicacaoTab({
   onToast: (msg: string) => void;
 }) {
   const [pending, startTransition] = useTransition();
-  const [confirm, setConfirm] = useState<null | "pdf" | "czech">(null);
+  const [confirm, setConfirm] = useState<null | "pdf" | "czech" | "countdown">(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [testing, startTestTransition] = useTransition();
 
@@ -642,10 +643,14 @@ function ComunicacaoTab({
     });
   }
 
-  function run(kind: "pdf" | "czech") {
+  function run(kind: "pdf" | "czech" | "countdown") {
     startTransition(async () => {
       const res =
-        kind === "pdf" ? await resendApprovedPdfs() : await notifyCzechFix();
+        kind === "pdf"
+          ? await resendApprovedPdfs()
+          : kind === "czech"
+            ? await notifyCzechFix()
+            : await notifyCountdown();
       setConfirm(null);
       if (!res.ok) {
         onToast(res.error);
@@ -699,6 +704,28 @@ function ComunicacaoTab({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Contagem regressiva + palpites */}
+        <div className="border-2 border-green p-5 flex flex-col">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Contagem regressiva pra estreia
+          </div>
+          <p className="font-serif italic text-sm text-soft flex-1">
+            Envia pra todos os aprovados o email de hype da estreia (&quot;faltam X
+            dias&quot;, calculado automático) com o PDF dos palpites em anexo e &quot;boa
+            sorte&quot;.
+          </p>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute my-3">
+            Destinatários: <b className="text-ink">{approvedCount}</b> aprovado(s)
+          </div>
+          <button
+            onClick={() => setConfirm("countdown")}
+            disabled={pending || approvedCount === 0}
+            className="px-4 py-2.5 bg-green text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-green hover:bg-green2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {pending ? "Processando..." : "Enviar contagem regressiva"}
+          </button>
+        </div>
+
         {/* Reenviar PDFs */}
         <div className="border-2 border-ink p-5 flex flex-col">
           <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
@@ -761,7 +788,9 @@ function ComunicacaoTab({
               <p className="font-serif text-sm text-ink mb-4">
                 {confirm === "pdf"
                   ? `Reenviar o PDF de confirmação para ${approvedCount} apostador(es) aprovado(s)? Eles vão receber o email novamente.`
-                  : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
+                  : confirm === "countdown"
+                    ? `Enviar o email de contagem regressiva pra estreia, com o PDF dos palpites em anexo, para ${approvedCount} apostador(es) aprovado(s)?`
+                    : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
               </p>
               <div className="flex justify-end gap-2">
                 <button

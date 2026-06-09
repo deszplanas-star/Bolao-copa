@@ -171,6 +171,61 @@ export async function sendCzechFixNotice(input: {
 }
 
 /**
+ * Email de contagem regressiva pra estreia da Copa, com o PDF dos palpites
+ * em anexo. `daysLeft` é calculado pelo servidor (dias até o 1º jogo) e a
+ * chamada adapta o tom ("faltam N dias" / "é amanhã" / "é hoje").
+ */
+export async function sendCountdownEmail(input: {
+  user_name: string;
+  user_email: string;
+  pdfBytes: Uint8Array;
+  daysLeft: number;
+}): Promise<boolean> {
+  const d = input.daysLeft;
+  const phraseSubject = d <= 0 ? "É HOJE" : d === 1 ? "É amanhã" : `Faltam ${d} dias`;
+  const headline =
+    d <= 0 ? "É hoje! A bola vai rolar ⚽" : d === 1 ? "É amanhã! ⚽" : `Faltam ${d} dias 🏆`;
+  const firstName = escapeHtml(input.user_name.split(" ")[0]);
+  const subject = `⚽ ${phraseSubject} para a Copa — seus palpites estão selados!`;
+
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #d2dae5;">
+      <div style="background:#002776; padding:28px 24px; text-align:center;">
+        <div style="font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#FFDF00; font-weight:bold;">Bolão da Copa · 2026</div>
+        <div style="color:#ffffff; font-size:26px; font-weight:800; margin-top:8px;">${headline}</div>
+      </div>
+      <div style="padding:24px;">
+        <p style="margin-top:0;">Olá, ${firstName}! 👋</p>
+        <p>A espera está no fim — a Copa vai começar e o seu bolão entra em campo de vez. Seus <strong>72 palpites já estão selados</strong> e guardados a sete chaves. 🔒</p>
+        <p>Pra você relembrar onde apostou suas fichas, <strong>vai em anexo o PDF com todos os seus palpites</strong>. Dá uma última conferida e já começa a torcer!</p>
+        <div style="background:#f4f6f9; border-left:4px solid #009739; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">Como você pontua:</strong><br/>
+          🎯 Placar exato: <strong>+3 pontos</strong><br/>
+          ✅ Só o vencedor / empate certo: <strong>+1 ponto</strong><br/>
+          ⬜ Errou: <strong>0</strong>
+        </div>
+        <p>Agora é acompanhar o <strong>ranking ao vivo</strong> a cada jogo e ver suas fichas renderem. Que vença o melhor palpiteiro!</p>
+        <p style="font-weight:bold; color:#009739; font-size:16px;">Boa sorte! 🍀⚽</p>
+        <a href="${APP_URL}/apostas" style="display:inline-block; background:#009739; color:white; padding:12px 20px; text-decoration:none; font-weight:bold; margin-top:6px;">Ver meus palpites e o ranking →</a>
+        <p style="color:#8092ab; font-size:12px; margin-top:20px;">Você recebe este email porque sua participação no Bolão da Copa 2026 está confirmada.</p>
+      </div>
+    </div>
+  `;
+
+  return send({
+    to: input.user_email,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `palpites-${slugify(input.user_name)}.pdf`,
+        content: Buffer.from(input.pdfBytes),
+      },
+    ],
+  });
+}
+
+/**
  * Envia um email de teste APENAS para o admin (adminEmail). Não usa PDF nem
  * depende de role/RLS — serve só pra provar que o transporte Gmail SMTP está
  * funcionando no ambiente de produção. Devolve o motivo exato em caso de falha
