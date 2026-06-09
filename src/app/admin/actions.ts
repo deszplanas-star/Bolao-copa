@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { waitUntil } from "@vercel/functions";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthedAdmin } from "@/lib/auth";
 import { buildUserBetsPdf } from "@/lib/bets-pdf";
 import {
@@ -61,7 +62,7 @@ async function logAdmin(
   targetId: string,
   payload: Record<string, unknown> = {},
 ) {
-  const supabase = createClient();
+  const supabase = createAdminClient() ?? createClient();
   await supabase.from("admin_logs").insert({
     admin_id: adminId,
     action,
@@ -318,8 +319,18 @@ export async function setUserEditsUnlocked(input: unknown): Promise<ActionResult
   const admin = await getAuthedAdmin();
   if (!admin) return { ok: false, error: "Acesso negado." };
 
-  const supabase = createClient();
-  const { data, error } = await supabase
+  // Service role: bypassa RLS. Não depende de role='admin' nem de policy de
+  // UPDATE em users — quem chega aqui já passou pelo getAuthedAdmin.
+  const db = createAdminClient();
+  if (!db) {
+    return {
+      ok: false,
+      error:
+        "Falta a SUPABASE_SERVICE_ROLE_KEY na Vercel — adicione (Production) e refaça o deploy.",
+    };
+  }
+
+  const { data, error } = await db
     .from("users")
     .update({ edits_unlocked: parsed.data.unlocked })
     .eq("id", parsed.data.user_id)
@@ -334,11 +345,7 @@ export async function setUserEditsUnlocked(input: unknown): Promise<ActionResult
     };
   }
   if (!data || data.length === 0) {
-    return {
-      ok: false,
-      error:
-        "Nada foi alterado (0 linhas) — RLS bloqueou. Faltam a policy users_admin_update (migration 0005) e/ou seu role='admin' no banco.",
-    };
+    return { ok: false, error: "Apostador não encontrado (0 linhas)." };
   }
 
   await logAdmin(admin.id, "user.edits_unlocked", "user", parsed.data.user_id, {
@@ -360,9 +367,16 @@ export async function lockReopenedMatches(): Promise<
   const admin = await getAuthedAdmin();
   if (!admin) return { ok: false, error: "Acesso negado." };
 
-  const supabase = createClient();
+  const db = createAdminClient();
+  if (!db) {
+    return {
+      ok: false,
+      error:
+        "Falta a SUPABASE_SERVICE_ROLE_KEY na Vercel — adicione (Production) e refaça o deploy.",
+    };
+  }
 
-  const { data: open, error: selErr } = await supabase
+  const { data: open, error: selErr } = await db
     .from("matches")
     .select("id")
     .eq("reopened", true);
@@ -371,7 +385,7 @@ export async function lockReopenedMatches(): Promise<
   const openCount = open?.length ?? 0;
   if (openCount === 0) return { ok: true, locked: 0 };
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("matches")
     .update({ reopened: false })
     .eq("reopened", true)
@@ -379,13 +393,6 @@ export async function lockReopenedMatches(): Promise<
   if (error) return { ok: false, error: error.message };
 
   const locked = data?.length ?? 0;
-  if (locked === 0) {
-    return {
-      ok: false,
-      error:
-        "Havia jogos reabertos mas nada foi travado (RLS) — seu role='admin' provavelmente não está setado no banco.",
-    };
-  }
 
   await logAdmin(admin.id, "match.lock_reopened", "match", admin.id, { locked });
   revalidatePath("/admin");
