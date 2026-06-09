@@ -8,6 +8,7 @@ import {
   denyPayment,
   notifyCzechFix,
   resendApprovedPdfs,
+  sendAdminTestEmail,
   setMatchResult,
 } from "./actions";
 
@@ -628,6 +629,18 @@ function ComunicacaoTab({
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<null | "pdf" | "czech">(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [testing, startTestTransition] = useTransition();
+
+  function runTest() {
+    startTestTransition(async () => {
+      const res = await sendAdminTestEmail();
+      if (res.ok) {
+        onToast(`✅ ${res.detail} Confira sua caixa (e o spam).`);
+      } else {
+        onToast(`❌ ${res.error}`);
+      }
+    });
+  }
 
   function run(kind: "pdf" | "czech") {
     startTransition(async () => {
@@ -663,6 +676,27 @@ function ComunicacaoTab({
           Último disparo: {lastResult}
         </div>
       )}
+
+      {/* Teste de transporte — envia só pro admin, sem PDF nem role */}
+      <div className="mb-4 border-2 border-yellow bg-yellow/10 p-5 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="flex-1">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Testar envio (só pra mim)
+          </div>
+          <p className="font-serif italic text-sm text-soft">
+            Dispara um email de teste apenas pra <b>você</b> (admin). Não envia pra
+            ninguém mais, não usa PDF nem depende de aprovação — serve só pra confirmar
+            que o Gmail está funcionando. A própria tela avisa se deu certo ou o motivo da falha.
+          </p>
+        </div>
+        <button
+          onClick={runTest}
+          disabled={testing}
+          className="px-4 py-2.5 bg-ink text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-ink hover:bg-yellow hover:text-ink hover:border-yellow disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          {testing ? "Enviando..." : "Enviar teste pra mim"}
+        </button>
+      </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Reenviar PDFs */}

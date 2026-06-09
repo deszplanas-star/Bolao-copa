@@ -170,6 +170,57 @@ export async function sendCzechFixNotice(input: {
   return send({ to: input.user_email, subject, html });
 }
 
+/**
+ * Envia um email de teste APENAS para o admin (adminEmail). Não usa PDF nem
+ * depende de role/RLS — serve só pra provar que o transporte Gmail SMTP está
+ * funcionando no ambiente de produção. Devolve o motivo exato em caso de falha
+ * (credencial ausente vs. erro do servidor SMTP) pra facilitar o diagnóstico.
+ */
+export async function sendTestEmail(): Promise<{
+  ok: boolean;
+  detail: string;
+  to: string;
+}> {
+  if (!GMAIL_USER || !GMAIL_PASS) {
+    return {
+      ok: false,
+      detail:
+        "GMAIL_USER/GMAIL_APP_PASSWORD ausentes no ambiente — confira as variáveis na Vercel e refaça o deploy.",
+      to: adminEmail,
+    };
+  }
+  const t = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_PASS },
+  });
+  try {
+    await t.sendMail({
+      from: fromEmail,
+      to: adminEmail,
+      subject: "[Bolão 26] Teste de envio (Gmail SMTP)",
+      html: `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #009739; margin-bottom: 4px;">Transporte de email OK ✅</h2>
+      <p style="color: #5a6a85; margin-top: 0;">Se você está lendo isto, o envio via Gmail SMTP está funcionando em produção.</p>
+      <hr style="border: none; border-top: 1px solid #d2dae5; margin: 16px 0;" />
+      <p style="margin: 4px 0;"><strong>Remetente:</strong> ${escapeHtml(fromEmail)}</p>
+      <p style="margin: 4px 0;"><strong>Destinatário:</strong> ${escapeHtml(adminEmail)}</p>
+      <p style="color: #8092ab; font-size: 12px; margin-top: 16px;">Email de teste disparado pelo painel /admin → Comunicação.</p>
+    </div>
+  `,
+    });
+    return { ok: true, detail: `Email de teste enviado para ${adminEmail}.`, to: adminEmail };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Falha no servidor SMTP: ${(e as Error).message}`,
+      to: adminEmail,
+    };
+  }
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

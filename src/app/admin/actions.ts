@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthedAdmin } from "@/lib/auth";
 import { buildUserBetsPdf } from "@/lib/bets-pdf";
-import { sendCzechFixNotice, sendUserApprovalNotification } from "@/lib/email";
+import { sendCzechFixNotice, sendTestEmail, sendUserApprovalNotification } from "@/lib/email";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 type BroadcastResult =
@@ -213,6 +213,27 @@ export async function notifyCzechFix(): Promise<BroadcastResult> {
   });
 
   return { ok: true, total: recipients.length, sent, failed };
+}
+
+/**
+ * Dispara um email de teste SÓ para o admin logado (adminEmail), pra validar
+ * o transporte Gmail em produção sem spammar ninguém e sem depender de
+ * PDF/role. Aguarda o resultado (não usa waitUntil) pra devolver o veredito.
+ */
+export async function sendAdminTestEmail(): Promise<
+  { ok: true; detail: string; to: string } | { ok: false; error: string }
+> {
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const res = await sendTestEmail();
+  await logAdmin(admin.id, "email.test", "admin", admin.id, {
+    ok: res.ok,
+    detail: res.detail,
+  });
+
+  if (!res.ok) return { ok: false, error: res.detail };
+  return { ok: true, detail: res.detail, to: res.to };
 }
 
 export async function denyPayment(input: unknown): Promise<ActionResult> {
