@@ -30,21 +30,31 @@ export default async function AdminPage() {
 
   const supabase = createClient();
 
-  const [paymentsRes, usersRes, groupsRes, teamsRes, matchesRes] = await Promise.all([
-    supabase
-      .from("payments")
-      .select(
-        "id,user_id,amount_cents,status,user_confirmed_at,approved_at,denied_reason,created_at",
-      )
-      .order("user_confirmed_at", { ascending: false }),
-    supabase.from("users").select("id,email,name"),
-    supabase.from("groups").select("*").order("ord", { ascending: true }),
-    supabase.from("teams").select("*"),
-    supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
-  ]);
+  const [paymentsRes, usersRes, unlockedRes, groupsRes, teamsRes, matchesRes] =
+    await Promise.all([
+      supabase
+        .from("payments")
+        .select(
+          "id,user_id,amount_cents,status,user_confirmed_at,approved_at,denied_reason,created_at",
+        )
+        .order("user_confirmed_at", { ascending: false }),
+      supabase.from("users").select("id,email,name"),
+      // Query isolada da flag: se a coluna ainda não existir (migration não
+      // rodada), só este resultado falha — a lista de usuários continua de pé.
+      supabase.from("users").select("id,edits_unlocked"),
+      supabase.from("groups").select("*").order("ord", { ascending: true }),
+      supabase.from("teams").select("*"),
+      supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
+    ]);
 
   const payments = (paymentsRes.data ?? []) as PaymentRow[];
   const users = (usersRes.data ?? []) as UserRow[];
+  const unlockedById = new Map(
+    ((unlockedRes.data ?? []) as { id: string; edits_unlocked: boolean }[]).map((u) => [
+      u.id,
+      u.edits_unlocked === true,
+    ]),
+  );
   const groups = (groupsRes.data ?? []) as Group[];
   const teams = (teamsRes.data ?? []) as Team[];
   const matches = (matchesRes.data ?? []) as Match[];
@@ -52,10 +62,13 @@ export default async function AdminPage() {
   const userById = new Map(users.map((u) => [u.id, u]));
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
-  const enrichedPayments = payments.map((p) => ({
-    ...p,
-    user: userById.get(p.user_id) ?? null,
-  }));
+  const enrichedPayments = payments.map((p) => {
+    const u = userById.get(p.user_id);
+    return {
+      ...p,
+      user: u ? { ...u, edits_unlocked: unlockedById.get(u.id) ?? false } : null,
+    };
+  });
 
   const enrichedMatches = matches
     .map((m) => {

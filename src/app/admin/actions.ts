@@ -301,6 +301,98 @@ export async function notifyCountdown(): Promise<BroadcastResult> {
   return { ok: true, total: userIds.length, sent, failed };
 }
 
+const setEditsUnlockedSchema = z.object({
+  user_id: z.string().uuid(),
+  unlocked: z.boolean(),
+});
+
+/**
+ * Liga/desliga a liberação de edição individual (users.edits_unlocked) de um
+ * apostador. Detecta 0 linhas afetadas e devolve erro explícito — pra não
+ * falhar em silêncio se faltar a coluna (migration) ou o role='admin' (RLS).
+ */
+export async function setUserEditsUnlocked(input: unknown): Promise<ActionResult> {
+  const parsed = setEditsUnlockedSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Entrada inválida." };
+
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("users")
+    .update({ edits_unlocked: parsed.data.unlocked })
+    .eq("id", parsed.data.user_id)
+    .select("id");
+
+  if (error) {
+    return {
+      ok: false,
+      error: error.message.includes("edits_unlocked")
+        ? "A coluna edits_unlocked ainda não existe no banco — rode a migration 0004 antes."
+        : `Falhou: ${error.message}`,
+    };
+  }
+  if (!data || data.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Nada foi alterado (0 linhas). Seu usuário provavelmente não tem role='admin' no banco — o RLS bloqueia editar outro apostador.",
+    };
+  }
+
+  await logAdmin(admin.id, "user.edits_unlocked", "user", parsed.data.user_id, {
+    unlocked: parsed.data.unlocked,
+  });
+  revalidatePath("/admin");
+  revalidatePath("/apostas");
+  return { ok: true };
+}
+
+/**
+ * Trava todos os jogos que estão `reopened=true` (ex.: correção da Tcheca no
+ * Grupo A). Mesma proteção contra falha silenciosa: se havia jogos abertos mas
+ * nada foi travado, avisa que é provável problema de role/RLS.
+ */
+export async function lockReopenedMatches(): Promise<
+  { ok: true; locked: number } | { ok: false; error: string }
+> {
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const supabase = createClient();
+
+  const { data: open, error: selErr } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("reopened", true);
+  if (selErr) return { ok: false, error: selErr.message };
+
+  const openCount = open?.length ?? 0;
+  if (openCount === 0) return { ok: true, locked: 0 };
+
+  const { data, error } = await supabase
+    .from("matches")
+    .update({ reopened: false })
+    .eq("reopened", true)
+    .select("id");
+  if (error) return { ok: false, error: error.message };
+
+  const locked = data?.length ?? 0;
+  if (locked === 0) {
+    return {
+      ok: false,
+      error:
+        "Havia jogos reabertos mas nada foi travado (RLS) — seu role='admin' provavelmente não está setado no banco.",
+    };
+  }
+
+  await logAdmin(admin.id, "match.lock_reopened", "match", admin.id, { locked });
+  revalidatePath("/admin");
+  revalidatePath("/apostas");
+  return { ok: true, locked };
+}
+
 export async function denyPayment(input: unknown): Promise<ActionResult> {
   const parsed = denyPaymentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Entrada inválida." };

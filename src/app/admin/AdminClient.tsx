@@ -6,11 +6,13 @@ import {
   approvePayment,
   clearMatchResult,
   denyPayment,
+  lockReopenedMatches,
   notifyCountdown,
   notifyCzechFix,
   resendApprovedPdfs,
   sendAdminTestEmail,
   setMatchResult,
+  setUserEditsUnlocked,
 } from "./actions";
 
 type EnrichedPayment = {
@@ -22,7 +24,7 @@ type EnrichedPayment = {
   approved_at: string | null;
   denied_reason: string | null;
   created_at: string;
-  user: { id: string; email: string; name: string | null } | null;
+  user: { id: string; email: string; name: string | null; edits_unlocked: boolean } | null;
 };
 
 type EnrichedMatch = Match & { home: Team; away: Team };
@@ -210,6 +212,22 @@ function PaymentsTab({
     });
   }
 
+  function handleToggleEdits(userId: string, currentlyUnlocked: boolean) {
+    startTransition(async () => {
+      const res = await setUserEditsUnlocked({
+        user_id: userId,
+        unlocked: !currentlyUnlocked,
+      });
+      onToast(
+        res.ok
+          ? currentlyUnlocked
+            ? "Edição travada pra esta pessoa"
+            : "Edição liberada só pra esta pessoa"
+          : res.error,
+      );
+    });
+  }
+
   return (
     <div>
       <div className="flex items-baseline justify-between mb-6">
@@ -318,6 +336,25 @@ function PaymentsTab({
                         className="px-3 py-1.5 bg-paper text-green font-anton text-[11px] uppercase tracking-wider border-2 border-green hover:bg-green hover:text-paper disabled:opacity-50"
                       >
                         Reaprovar
+                      </button>
+                    )}
+                    {p.user && (
+                      <button
+                        onClick={() => handleToggleEdits(p.user!.id, p.user!.edits_unlocked)}
+                        disabled={pending}
+                        title={
+                          p.user.edits_unlocked
+                            ? "Travar a edição dos palpites desta pessoa"
+                            : "Liberar edição dos palpites só pra esta pessoa"
+                        }
+                        className={[
+                          "ml-2 px-3 py-1.5 font-anton text-[11px] uppercase tracking-wider border-2 disabled:opacity-50",
+                          p.user.edits_unlocked
+                            ? "bg-yellow text-ink border-yellow hover:bg-ink hover:text-paper hover:border-ink"
+                            : "bg-paper text-ink border-ink hover:bg-ink hover:text-paper",
+                        ].join(" ")}
+                      >
+                        {p.user.edits_unlocked ? "✎ Travar edição" : "✎ Liberar edição"}
                       </button>
                     )}
                   </td>
@@ -631,6 +668,22 @@ function ComunicacaoTab({
   const [confirm, setConfirm] = useState<null | "pdf" | "czech" | "countdown">(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [testing, startTestTransition] = useTransition();
+  const [locking, startLockTransition] = useTransition();
+
+  function runLockReopened() {
+    startLockTransition(async () => {
+      const res = await lockReopenedMatches();
+      if (res.ok) {
+        onToast(
+          res.locked > 0
+            ? `🔒 ${res.locked} jogo(s) reaberto(s) travado(s)`
+            : "Nenhum jogo estava reaberto.",
+        );
+      } else {
+        onToast(`❌ ${res.error}`);
+      }
+    });
+  }
 
   function runTest() {
     startTestTransition(async () => {
@@ -700,6 +753,27 @@ function ComunicacaoTab({
           className="px-4 py-2.5 bg-ink text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-ink hover:bg-yellow hover:text-ink hover:border-yellow disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
         >
           {testing ? "Enviando..." : "Enviar teste pra mim"}
+        </button>
+      </div>
+
+      {/* Travar jogos reabertos (Tcheca) — manutenção, não é email */}
+      <div className="mb-4 border-2 border-rule p-5 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="flex-1">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Travar jogos reabertos (Tcheca)
+          </div>
+          <p className="font-serif italic text-sm text-soft">
+            Fecha todos os jogos que estão reabertos pra correção (Grupo A,
+            República Tcheca). Depois disso ninguém mais edita esses jogos, mesmo
+            dentro da janela. Não envia email.
+          </p>
+        </div>
+        <button
+          onClick={runLockReopened}
+          disabled={locking}
+          className="px-4 py-2.5 bg-ink text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-ink hover:bg-red-700 hover:border-red-700 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          {locking ? "Travando..." : "🔒 Travar Tcheca"}
         </button>
       </div>
 
