@@ -329,7 +329,7 @@ export async function setUserEditsUnlocked(input: unknown): Promise<ActionResult
     return {
       ok: false,
       error: error.message.includes("edits_unlocked")
-        ? "A coluna edits_unlocked ainda não existe no banco — rode a migration 0004 antes."
+        ? "Coluna edits_unlocked não encontrada no schema cache — se a migration 0004 já rodou, espere ~30s ou rode `NOTIFY pgrst, 'reload schema';` e tente de novo."
         : `Falhou: ${error.message}`,
     };
   }
@@ -337,7 +337,7 @@ export async function setUserEditsUnlocked(input: unknown): Promise<ActionResult
     return {
       ok: false,
       error:
-        "Nada foi alterado (0 linhas). Seu usuário provavelmente não tem role='admin' no banco — o RLS bloqueia editar outro apostador.",
+        "Nada foi alterado (0 linhas) — RLS bloqueou. Faltam a policy users_admin_update (migration 0005) e/ou seu role='admin' no banco.",
     };
   }
 
