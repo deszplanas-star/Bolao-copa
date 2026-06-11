@@ -73,7 +73,15 @@ export default function ApostasClient({
   editsUnlocked,
 }: Props) {
   const sealed = paymentStatus === "pending" || paymentStatus === "approved";
-  const [tab, setTab] = useState<TabKey>("apostas");
+  // Aba inicial pode vir da URL (?tab=resultados) — é pra onde a notificação
+  // de gol aponta, direto no jogo ao vivo.
+  const [tab, setTab] = useState<TabKey>(() => {
+    if (typeof window !== "undefined") {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      if (TABS.some((x) => x.key === t)) return t as TabKey;
+    }
+    return "apostas";
+  });
   const initialGroup = groups[0]?.code ?? "A";
   const [currentGroup, setCurrentGroup] = useState<string>(initialGroup);
   const [drafts, setDrafts] = useState<DraftMap>(() => {

@@ -208,12 +208,14 @@ async function main() {
         title: "Fim de jogo! 🏁",
         body: `${homeName} ${hs} × ${as} ${awayName} — confira seus pontos no ranking`,
         tag: `fim-${am.id}`,
+        url: "/apostas?tab=ranking",
       });
     } else if (scoreChanged) {
       pushEvents.push({
         title: "GOL! ⚽",
         body: `${homeName} ${hs} × ${as} ${awayName}`,
         tag: `gol-${am.id}`,
+        url: "/apostas?tab=resultados",
       });
     }
   }

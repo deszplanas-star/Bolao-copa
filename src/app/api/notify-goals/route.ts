@@ -12,6 +12,7 @@ type GoalEvent = {
   title: string;
   body: string;
   tag?: string;
+  url?: string;
 };
 
 export async function POST(req: NextRequest) {
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       title: ev.title,
       body: ev.body,
       tag: ev.tag ?? "bolao26-gol",
-      url: "/apostas",
+      url: ev.url ?? "/apostas?tab=resultados",
     });
     await Promise.all(
       (subs ?? []).map(async (s) => {
