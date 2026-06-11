@@ -61,4 +61,8 @@ export type RankingRow = {
   misses: number;
   resolved_count: number;
   position: number;
+  // Penalidade aplicada pelo admin (migration 0006) — opcionais até a
+  // migration rodar, pra view antiga não quebrar o app.
+  penalty_points?: number;
+  penalty_reason?: string | null;
 };

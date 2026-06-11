@@ -634,7 +634,7 @@ export default function ApostasClient({
         )}
 
         {tab === "ranking" && (
-          <RankingTab rankings={rankings} currentUserId={currentUserId} />
+          <RankingTab rankings={rankings} currentUserId={currentUserId} onToast={setToast} />
         )}
         {tab === "resultados" && <ResultadosTab matches={matches} />}
         {tab === "minhas" && <MinhasApostasTab matches={matches} />}
@@ -927,9 +927,11 @@ function EmptyTab({ title, text }: { title: React.ReactNode; text: string }) {
 function RankingTab({
   rankings,
   currentUserId,
+  onToast,
 }: {
   rankings: RankingRow[];
   currentUserId: string;
+  onToast: (msg: string) => void;
 }) {
   if (rankings.length === 0) {
     return (
@@ -1010,6 +1012,26 @@ function RankingTab({
                         </span>
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink">
+                        {(r.penalty_points ?? 0) > 0 && (
+                          <button
+                            type="button"
+                            className="mr-1.5 cursor-help"
+                            title={
+                              r.penalty_reason ??
+                              `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
+                            }
+                            onClick={() =>
+                              onToast(
+                                `🔨 ${r.name ?? "Jogador"}: ${
+                                  r.penalty_reason ??
+                                  `-${r.penalty_points} ponto(s) por punição do admin`
+                                }`,
+                              )
+                            }
+                          >
+                            🔨
+                          </button>
+                        )}
                         {r.name ?? "Sem nome"}
                         {isMe && (
                           <span className="ml-2 font-mono text-[9px] tracking-widest text-green">
