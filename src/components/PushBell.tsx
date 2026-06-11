@@ -49,27 +49,43 @@ export default function PushBell({ onToast }: { onToast?: (msg: string) => void 
     }
     setState("busy");
     try {
-      const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
-
-      if (existing) {
-        await removePushSubscription({ endpoint: existing.endpoint });
-        await existing.unsubscribe();
+      // Desativar: já estamos inscritos neste dispositivo
+      if (state === "on") {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) {
+          await removePushSubscription({ endpoint: existing.endpoint });
+          await existing.unsubscribe();
+        }
         setState("off");
         onToast?.("Notificações de gol desativadas.");
         return;
       }
 
-      const perm = await Notification.requestPermission();
+      // Ativar: a permissão tem que ser pedida JÁ, dentro do gesto do toque —
+      // o iOS invalida o pedido se houver await demorado antes (ex.: sw.ready).
+      const perm =
+        Notification.permission === "granted"
+          ? "granted"
+          : await Notification.requestPermission();
       if (perm !== "granted") {
         setState(perm === "denied" ? "denied" : "off");
         onToast?.("Permissão de notificação não concedida.");
         return;
       }
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid),
-      });
+
+      // Garante o service worker (se o registro do load falhou, tenta de novo)
+      const reg =
+        (await navigator.serviceWorker.getRegistration()) ??
+        (await navigator.serviceWorker.register("/sw.js"));
+      await navigator.serviceWorker.ready;
+
+      const sub =
+        (await reg.pushManager.getSubscription()) ??
+        (await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapid),
+        }));
       const res = await savePushSubscription(sub.toJSON());
       if (!res.ok) {
         await sub.unsubscribe();
@@ -81,8 +97,15 @@ export default function PushBell({ onToast }: { onToast?: (msg: string) => void 
       onToast?.("🔔 Você vai receber aviso a cada gol!");
     } catch (e) {
       console.error("[push] toggle falhou", e);
+      const err = e as Error;
       setState("off");
-      onToast?.("Não consegui ativar as notificações aqui.");
+      // AbortError = serviço de push do navegador recusou (comum em browser
+      // com proteções, ou iOS fora do app instalado). Mostra a causa real.
+      onToast?.(
+        err?.name === "AbortError"
+          ? "O navegador recusou o serviço de push — no iPhone, abra pelo app instalado na tela de início."
+          : `Não consegui ativar: ${err?.name ?? "Erro"} — ${String(err?.message ?? "").slice(0, 140)}`,
+      );
     }
   }
 

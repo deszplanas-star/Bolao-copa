@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import PwaSetup from "@/components/PwaSetup";
+import InstallBanner from "@/components/InstallBanner";
 
 export const metadata: Metadata = {
   title: "Bolão 26 — O bolão da Copa do Mundo 2026",
@@ -33,6 +34,7 @@ export default function RootLayout({
       <body>
         {children}
         <PwaSetup />
+        <InstallBanner />
       </body>
     </html>
   );
