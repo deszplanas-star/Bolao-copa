@@ -1044,6 +1044,17 @@ function RankingTab({
   );
 }
 
+// Relógio ESTIMADO pelo horário nominal do apito (a fonte gratuita não dá o
+// minuto oficial): 45' + 15 de intervalo + 2º tempo. O "~" avisa que é aproximado.
+function liveClock(kickoffIso: string, nowMs: number): string {
+  const min = Math.floor((nowMs - new Date(kickoffIso).getTime()) / 60000);
+  if (min < 1) return "começando";
+  if (min <= 47) return `~${Math.min(45, min)}' 1ºT`;
+  if (min <= 62) return "intervalo";
+  if (min <= 112) return `~${Math.min(90, min - 17)}' 2ºT`;
+  return "acréscimos";
+}
+
 function ResultadosTab({ matches }: { matches: MatchView[] }) {
   // Jogo "ao vivo" = horário do apito já passou e ainda não foi encerrado
   // (janela de 3h cobre acréscimos). O placar parcial vem do ingest (1 min).
@@ -1121,7 +1132,7 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
                 {isLive ? (
                   <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-green font-bold">
                     <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" />
-                    Ao vivo
+                    Ao vivo · {liveClock(m.kickoff_at, nowMs)}
                   </div>
                 ) : (
                   <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
