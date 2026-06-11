@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { computeStandings } from "@/lib/standings";
+import type { MatchView, Team } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -48,20 +50,87 @@ export default async function ChaveamentoPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/chaveamento");
 
-  // Defensivo: antes da migration 0005 (ou do 1º ingest), a tabela pode não
-  // existir ou estar vazia — a página mostra o esqueleto com aviso.
-  const { data, error } = await supabase
-    .from("ko_matches")
-    .select("*")
-    .order("kickoff_at", { ascending: true });
+  const [groupsRes, teamsRes, matchesRes, predsRes, koRes] = await Promise.all([
+    supabase.from("groups").select("id, code").order("code"),
+    supabase.from("teams").select("*"),
+    supabase.from("matches").select("*"),
+    supabase
+      .from("predictions")
+      .select("match_id, home_score, away_score")
+      .eq("user_id", user.id),
+    // Defensivo: antes da migration 0005 / do 1º ingest, pode não existir
+    supabase.from("ko_matches").select("*").order("kickoff_at", { ascending: true }),
+  ]);
 
-  const matches = (error ? [] : (data ?? [])) as KoMatch[];
+  const groups = groupsRes.data ?? [];
+  const teams = (teamsRes.data ?? []) as Team[];
+  const matches = matchesRes.data ?? [];
+  const preds = predsRes.data ?? [];
+  const ko = (koRes.error ? [] : (koRes.data ?? [])) as KoMatch[];
+
+  const predByMatch = new Map(preds.map((p) => [p.match_id as string, p]));
+
+  // Classificação por grupo: usa o RESULTADO REAL quando o jogo já tem placar
+  // oficial; nos jogos restantes, usa O PALPITE do usuário. Quando o grupo
+  // termina de verdade, a projeção converge pro que realmente classificou.
+  type GroupView = {
+    code: string;
+    rows: ReturnType<typeof computeStandings>;
+    realCount: number;
+    palpiteCount: number;
+  };
+  const groupViews: GroupView[] = [];
+  const thirds: { code: string; row: ReturnType<typeof computeStandings>[number] }[] = [];
+
+  for (const g of groups) {
+    const gTeams = teams.filter((t) => t.group_id === g.id);
+    const gMatches = matches.filter((m) => m.group_id === g.id);
+    const drafts: Record<string, { home_score: number; away_score: number } | null> = {};
+    let realCount = 0;
+    let palpiteCount = 0;
+    for (const m of gMatches) {
+      const finished = m.home_score !== null && m.away_score !== null;
+      const p = predByMatch.get(m.id as string);
+      if (finished) {
+        drafts[m.id as string] = {
+          home_score: m.home_score as number,
+          away_score: m.away_score as number,
+        };
+        realCount++;
+      } else if (p) {
+        drafts[m.id as string] = {
+          home_score: p.home_score as number,
+          away_score: p.away_score as number,
+        };
+        palpiteCount++;
+      } else {
+        drafts[m.id as string] = null;
+      }
+    }
+    const rows = computeStandings(gTeams, gMatches as unknown as MatchView[], drafts);
+    groupViews.push({ code: g.code as string, rows, realCount, palpiteCount });
+    if (rows[2]) thirds.push({ code: g.code as string, row: rows[2] });
+  }
+
+  // 8 melhores terceiros (mesmo critério: pontos, saldo, gols pró)
+  const bestThirds = new Set(
+    thirds
+      .sort(
+        (a, b) =>
+          b.row.p - a.row.p || b.row.sg - a.row.sg || b.row.gp - a.row.gp,
+      )
+      .slice(0, 8)
+      .map((t) => t.code),
+  );
+
   const byStage = new Map<string, KoMatch[]>();
-  for (const m of matches) {
+  for (const m of ko) {
     const arr = byStage.get(m.stage) ?? [];
     arr.push(m);
     byStage.set(m.stage, arr);
   }
+
+  const anyPalpite = preds.length > 0;
 
   return (
     <div className="min-h-screen bg-paper">
@@ -85,26 +154,109 @@ export default async function ChaveamentoPage() {
           <span className="text-yellow">►</span> Chaveamento
         </h1>
         <p className="font-serif italic text-soft mt-1 text-sm mb-8">
-          Mata-mata da Copa 2026, atualizado automaticamente conforme os jogos são
-          definidos e jogados. Só pra acompanhar — o bolão vale a fase de grupos.
+          A classificação abaixo mistura <b>resultados reais</b> (jogos já encerrados) com{" "}
+          <b>os seus palpites</b> nos jogos que faltam — conforme a Copa anda, ela converge
+          pra classificação real. O mata-mata oficial se preenche sozinho no fim da fase de
+          grupos.
         </p>
 
-        {matches.length === 0 && (
-          <div className="border-2 border-dashed border-rule p-8 text-center font-serif italic text-soft">
-            O chaveamento aparece aqui assim que a FIFA definir os classificados —
-            os confrontos dos 16 avos saem ao fim da fase de grupos (27/06).
+        {/* ===== CLASSIFICAÇÃO PROJETADA ===== */}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-anton text-2xl uppercase tracking-tight text-ink">
+            Grupos — projeção
+          </h2>
+          <div className="font-mono text-[10px] uppercase tracking-widest text-mute">
+            <span className="inline-block w-3 h-3 bg-green/20 border border-green align-middle mr-1" />
+            classifica (top 2)
+            <span className="inline-block w-3 h-3 bg-yellow/30 border border-yellow align-middle ml-3 mr-1" />
+            3º entre os 8 melhores
+          </div>
+        </div>
+
+        {!anyPalpite && (
+          <div className="mb-6 border-l-4 border-yellow bg-yellow/10 px-4 py-3 font-serif italic text-sm text-ink">
+            Você ainda não tem palpites salvos — a projeção considera só os resultados
+            reais por enquanto. Preencha seus palpites em{" "}
+            <Link href="/apostas" className="text-green font-bold underline">
+              /apostas
+            </Link>
+            .
           </div>
         )}
 
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-12">
+          {groupViews.map((g) => (
+            <div key={g.code} className="border-2 border-rule bg-paper">
+              <div className="flex items-center justify-between px-3 py-2 border-b-2 border-ink">
+                <span className="font-anton text-sm uppercase tracking-wider text-ink">
+                  Grupo {g.code}
+                </span>
+                <span className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                  {g.realCount > 0 ? `${g.realCount} real · ` : ""}
+                  {g.palpiteCount} palpite
+                </span>
+              </div>
+              <table className="w-full">
+                <tbody>
+                  {g.rows.map((r) => {
+                    const qualif = r.pos <= 2;
+                    const third = r.pos === 3 && bestThirds.has(g.code);
+                    return (
+                      <tr
+                        key={r.team.id}
+                        className={[
+                          "border-b border-rule last:border-0",
+                          qualif ? "bg-green/10" : third ? "bg-yellow/20" : "",
+                        ].join(" ")}
+                      >
+                        <td className="px-2 py-1.5 font-mono text-[10px] text-mute w-6">
+                          {r.pos}º
+                        </td>
+                        <td className="py-1.5">
+                          <span className="flex items-center gap-1.5 font-anton text-[12px] uppercase tracking-wide text-ink">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={flagUrl(r.team.iso_code)}
+                              alt=""
+                              className="w-4 h-auto border border-rule"
+                            />
+                            {r.team.name}
+                          </span>
+                        </td>
+                        <td className="px-1 py-1.5 font-mono text-[11px] text-ink text-right w-8">
+                          {r.p}
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-[10px] text-mute text-right w-10">
+                          {r.sg > 0 ? `+${r.sg}` : r.sg}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+
+        {/* ===== MATA-MATA REAL ===== */}
+        <h2 className="font-anton text-2xl uppercase tracking-tight text-ink mb-3">
+          Mata-mata — oficial
+        </h2>
+        {ko.length === 0 && (
+          <div className="border-2 border-dashed border-rule p-8 text-center font-serif italic text-soft">
+            Os confrontos oficiais dos 16 avos aparecem aqui assim que a FIFA definir os
+            classificados (fim da fase de grupos, 27/06). Atualiza sozinho.
+          </div>
+        )}
         <div className="space-y-10">
           {STAGES.map(({ key, label }) => {
             const list = byStage.get(key) ?? [];
             if (list.length === 0) return null;
             return (
               <section key={key}>
-                <h2 className="font-anton text-xl uppercase tracking-tight text-green mb-3">
+                <h3 className="font-anton text-xl uppercase tracking-tight text-green mb-3">
                   {label}
-                </h2>
+                </h3>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {list.map((m) => {
                     const played = m.home_score !== null && m.away_score !== null;
@@ -131,9 +283,7 @@ export default async function ChaveamentoPage() {
                             </span>
                             <span className="font-anton text-base text-green">
                               {played ? t.score : "–"}
-                              {pens && (
-                                <span className="text-mute text-xs"> ({t.pen})</span>
-                              )}
+                              {pens && <span className="text-mute text-xs"> ({t.pen})</span>}
                             </span>
                           </div>
                         ))}
