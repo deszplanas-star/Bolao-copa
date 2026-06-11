@@ -65,9 +65,13 @@ function pairKey(a: string, b: string) {
 }
 
 async function run(req: NextRequest) {
-  const expected = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Aceita o CRON_SECRET (segredo dedicado, de baixo privilégio — é o que o
+  // n8n guarda) ou a service key (uso interno/manual).
   const got = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!expected || got !== expected) {
+  const svc = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const cron = process.env.CRON_SECRET?.trim();
+  const authorized = !!got && ((!!cron && got === cron) || (!!svc && got === svc));
+  if (!authorized) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
