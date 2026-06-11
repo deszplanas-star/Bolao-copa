@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { removePushSubscription, savePushSubscription } from "@/app/apostas/push-actions";
 
-// Converte a VAPID public key (base64url) pro formato do PushManager
-function urlBase64ToUint8Array(base64: string) {
+// Converte a VAPID public key (base64url) pro formato do PushManager.
+// O replace inicial descarta qualquer caractere fora do alfabeto base64url —
+// um \r invisível vindo do env já causou InvalidCharacterError no atob.
+function urlBase64ToUint8Array(raw: string) {
+  const base64 = raw.replace(/[^A-Za-z0-9\-_]/g, "");
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(b64);
