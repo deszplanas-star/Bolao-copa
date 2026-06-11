@@ -244,7 +244,60 @@ async function main() {
   if (problems.length) console.log("Avisos:\n- " + problems.join("\n- "));
 }
 
-main().catch((e) => {
+// ============================================================
+// MODO PLANTÃO: o cron do GitHub em repo grátis atrasa HORAS (medido:
+// ciclos de 4-5h em 11/06). Então cada execução que conseguir nascer
+// vira um plantão: fica em loop consultando a cada POLL_SEC enquanto
+// houver jogo rolando ou começando em breve, por até MAX_MIN minutos
+// (< 6h, o teto do job). Repo é público — minutos não contam cota.
+// ============================================================
+const POLL_SEC = parseInt(process.env.POLL_SEC || "60", 10);
+const MAX_MIN = parseInt(process.env.MAX_MIN || "330", 10);
+
+async function hasActionSoon() {
+  // Há jogo ao vivo agora, ou com kickoff nos próximos 30 min?
+  const rows = await sb(
+    "matches?select=kickoff_at,status&order=kickoff_at",
+  );
+  const now = Date.now();
+  for (const m of rows) {
+    const ko = Date.parse(m.kickoff_at);
+    const inPlayWindow = now >= ko - 30 * 60_000 && now <= ko + 150 * 60_000;
+    if (m.status !== "finished" && inPlayWindow) return true;
+  }
+  return false;
+}
+
+async function plantao() {
+  const deadline = Date.now() + MAX_MIN * 60_000;
+  let cycle = 0;
+  for (;;) {
+    cycle++;
+    console.log(`\n--- ciclo ${cycle} (${new Date().toISOString()}) ---`);
+    try {
+      await main();
+    } catch (e) {
+      console.error("ciclo falhou (segue o plantão):", e.message);
+    }
+    if (Date.now() >= deadline) {
+      console.log("Plantão encerrado (tempo máximo).");
+      return;
+    }
+    let action = false;
+    try {
+      action = await hasActionSoon();
+    } catch {
+      action = true; // na dúvida, continua de plantão
+    }
+    if (!action) {
+      console.log("Sem jogo ao vivo ou iminente — encerrando até o próximo cron.");
+      return;
+    }
+    await new Promise((r) => setTimeout(r, POLL_SEC * 1000));
+  }
+}
+
+plantao().catch((e) => {
   console.error("FALHOU:", e.message);
   process.exit(1);
 });
