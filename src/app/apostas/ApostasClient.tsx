@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Group, MatchView, RankingRow, Team } from "@/lib/types";
 import { computeStandings } from "@/lib/standings";
 import { isReopenWindowOpen } from "@/lib/reopen";
@@ -97,6 +98,15 @@ export default function ApostasClient({
     return init;
   });
   const [toast, setToast] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Placar/ranking ao vivo: nas abas Resultados e Ranking, recarrega os
+  // dados do servidor a cada 60s (mesmo ritmo do ingest), sem refresh manual.
+  useEffect(() => {
+    if (tab !== "resultados" && tab !== "ranking") return;
+    const id = setInterval(() => router.refresh(), 60_000);
+    return () => clearInterval(id);
+  }, [tab, router]);
   const [showPixModal, setShowPixModal] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -1035,11 +1045,19 @@ function RankingTab({
 }
 
 function ResultadosTab({ matches }: { matches: MatchView[] }) {
+  // Jogo "ao vivo" = horário do apito já passou e ainda não foi encerrado
+  // (janela de 3h cobre acréscimos). O placar parcial vem do ingest (1 min).
+  const nowMs = Date.now();
+  const live = matches.filter((m) => {
+    if (m.status === "finished") return false;
+    const ko = new Date(m.kickoff_at).getTime();
+    return nowMs >= ko && nowMs <= ko + 3 * 3600_000;
+  });
   const finished = matches.filter(
     (m) => m.status === "finished" && m.home_score !== null && m.away_score !== null,
   );
 
-  if (finished.length === 0) {
+  if (finished.length === 0 && live.length === 0) {
     return (
       <EmptyTab
         title={
@@ -1052,6 +1070,11 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
     );
   }
 
+  const list = [
+    ...live.map((m) => ({ m, isLive: true })),
+    ...finished.map((m) => ({ m, isLive: false })),
+  ];
+
   return (
     <div className="max-w-[860px] mx-auto px-8 py-10">
       <div className="flex items-baseline justify-between mb-6">
@@ -1059,12 +1082,15 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
           <span className="text-green">Resultados</span> oficiais
         </h2>
         <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {live.length > 0 && (
+            <b className="text-green mr-2">● {live.length} ao vivo</b>
+          )}
           {finished.length} {finished.length === 1 ? "jogo encerrado" : "jogos encerrados"}
         </span>
       </div>
 
       <div className="space-y-3">
-        {finished.map((m) => {
+        {list.map(({ m, isLive }) => {
           const hit = m.prediction
             ? m.prediction.points === 3
               ? "exact"
@@ -1089,12 +1115,19 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="font-anton text-2xl text-ink">
-                  {m.home_score} <span className="text-mute text-base mx-1">×</span>{" "}
-                  {m.away_score}
+                  {m.home_score ?? 0} <span className="text-mute text-base mx-1">×</span>{" "}
+                  {m.away_score ?? 0}
                 </div>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
-                  {fmtKickoff(m.kickoff_at)}
-                </div>
+                {isLive ? (
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-green font-bold">
+                    <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" />
+                    Ao vivo
+                  </div>
+                ) : (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                    {fmtKickoff(m.kickoff_at)}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2.5 justify-end min-w-0">
                 <span className="font-anton uppercase tracking-tight text-base truncate text-right">
