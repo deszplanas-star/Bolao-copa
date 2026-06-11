@@ -11,6 +11,7 @@ import {
   notifyCzechFix,
   resendApprovedPdfs,
   sendAdminTestEmail,
+  sendConsolidatedBets,
   setMatchResult,
   setUserEditsUnlocked,
 } from "./actions";
@@ -665,7 +666,9 @@ function ComunicacaoTab({
   onToast: (msg: string) => void;
 }) {
   const [pending, startTransition] = useTransition();
-  const [confirm, setConfirm] = useState<null | "pdf" | "czech" | "countdown">(null);
+  const [confirm, setConfirm] = useState<
+    null | "pdf" | "czech" | "countdown" | "consolidado"
+  >(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [testing, startTestTransition] = useTransition();
   const [locking, startLockTransition] = useTransition();
@@ -696,14 +699,16 @@ function ComunicacaoTab({
     });
   }
 
-  function run(kind: "pdf" | "czech" | "countdown") {
+  function run(kind: "pdf" | "czech" | "countdown" | "consolidado") {
     startTransition(async () => {
       const res =
         kind === "pdf"
           ? await resendApprovedPdfs()
           : kind === "czech"
             ? await notifyCzechFix()
-            : await notifyCountdown();
+            : kind === "countdown"
+              ? await notifyCountdown()
+              : await sendConsolidatedBets();
       setConfirm(null);
       if (!res.ok) {
         onToast(res.error);
@@ -778,6 +783,28 @@ function ComunicacaoTab({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Consolidado: todas as apostas pra todos */}
+        <div className="border-2 border-green p-5 flex flex-col">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Consolidado: todas as apostas pra todos
+          </div>
+          <p className="font-serif italic text-sm text-soft flex-1">
+            Monta um único PDF com as apostas de <b>todos</b> os aprovados (capa
+            com a lista de participantes) e envia esse mesmo PDF pra cada um.
+            Transparência total: todo mundo confere os palpites de todo mundo.
+          </p>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute my-3">
+            Destinatários: <b className="text-ink">{approvedCount}</b> aprovado(s)
+          </div>
+          <button
+            onClick={() => setConfirm("consolidado")}
+            disabled={pending || approvedCount === 0}
+            className="px-4 py-2.5 bg-green text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-green hover:bg-green2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {pending ? "Processando..." : "Enviar consolidado"}
+          </button>
+        </div>
+
         {/* Contagem regressiva + palpites */}
         <div className="border-2 border-green p-5 flex flex-col">
           <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
@@ -864,7 +891,9 @@ function ComunicacaoTab({
                   ? `Reenviar o PDF de confirmação para ${approvedCount} apostador(es) aprovado(s)? Eles vão receber o email novamente.`
                   : confirm === "countdown"
                     ? `Enviar o email de contagem regressiva pra estreia, com o PDF dos palpites em anexo, para ${approvedCount} apostador(es) aprovado(s)?`
-                    : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
+                    : confirm === "consolidado"
+                      ? `Enviar o PDF consolidado com as apostas de TODOS os participantes para ${approvedCount} apostador(es) aprovado(s)? Cada um recebe o mesmo PDF com tudo.`
+                      : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
               </p>
               <div className="flex justify-end gap-2">
                 <button

@@ -6,8 +6,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAuthedAdmin } from "@/lib/auth";
-import { buildUserBetsPdf } from "@/lib/bets-pdf";
+import { buildAllBetsPdf, buildUserBetsPdf } from "@/lib/bets-pdf";
 import {
+  sendConsolidatedBetsEmail,
   sendCountdownEmail,
   sendCzechFixNotice,
   sendTestEmail,
@@ -164,6 +165,57 @@ export async function resendApprovedPdfs(): Promise<BroadcastResult> {
   });
 
   return { ok: true, total: userIds.length, sent, failed };
+}
+
+/**
+ * Envia para TODOS os aprovados UM ÚNICO PDF consolidado com as apostas de
+ * TODOS os participantes — transparência: cada um pode conferir os palpites
+ * dos demais. O PDF é montado uma vez só e reaproveitado em todos os envios.
+ */
+export async function sendConsolidatedBets(): Promise<BroadcastResult> {
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const supabase = createClient();
+  const { data: rows, error } = await supabase
+    .from("payments")
+    .select("user_id, approved_at")
+    .eq("status", "approved");
+
+  if (error) return { ok: false, error: error.message };
+
+  const approvedAtByUser = new Map<string, string | null>();
+  for (const r of rows ?? []) {
+    approvedAtByUser.set(r.user_id as string, (r.approved_at as string | null) ?? null);
+  }
+  const userIds = Array.from(approvedAtByUser.keys());
+  if (userIds.length === 0) return { ok: true, total: 0, sent: 0, failed: 0 };
+
+  const consolidated = await buildAllBetsPdf(userIds, approvedAtByUser);
+  if (!consolidated) {
+    return {
+      ok: false,
+      error:
+        "Não consegui montar o PDF consolidado — nenhum palpite encontrado. Confira a SUPABASE_SERVICE_ROLE_KEY na Vercel ou o role='admin' no banco.",
+    };
+  }
+
+  const { sent, failed } = await runInChunks(consolidated.players, 4, (p) =>
+    sendConsolidatedBetsEmail({
+      user_name: p.name,
+      user_email: p.email,
+      totalPlayers: consolidated.players.length,
+      pdfBytes: consolidated.bytes,
+    }),
+  );
+
+  await logAdmin(admin.id, "broadcast.consolidated_bets", "payment", admin.id, {
+    total: consolidated.players.length,
+    sent,
+    failed,
+  });
+
+  return { ok: true, total: consolidated.players.length, sent, failed };
 }
 
 /**

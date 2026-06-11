@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { WHATSAPP_GROUP_URL } from "@/lib/pdf";
 
 // Envio via Gmail SMTP (sem necessidade de domínio verificado).
 // Configurar no ambiente: GMAIL_USER (ex.: deszplanas@gmail.com) e
@@ -219,6 +220,56 @@ export async function sendCountdownEmail(input: {
     attachments: [
       {
         filename: `palpites-${slugify(input.user_name)}.pdf`,
+        content: Buffer.from(input.pdfBytes),
+      },
+    ],
+  });
+}
+
+/**
+ * Email com o PDF CONSOLIDADO (apostas de todos os participantes) em anexo.
+ * Vai pra cada aprovado — todo mundo enxerga os palpites de todo mundo, pra
+ * garantir a transparência do bolão antes de a bola rolar.
+ */
+export async function sendConsolidatedBetsEmail(input: {
+  user_name: string;
+  user_email: string;
+  totalPlayers: number;
+  pdfBytes: Uint8Array;
+}): Promise<boolean> {
+  const firstName = escapeHtml(input.user_name.split(" ")[0]);
+  const subject = `[Bolão 26] Todas as apostas do bolão em um só PDF 🔍`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #d2dae5;">
+      <div style="background:#002776; padding:28px 24px; text-align:center;">
+        <div style="font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#FFDF00; font-weight:bold;">Bolão da Copa · 2026</div>
+        <div style="color:#ffffff; font-size:26px; font-weight:800; margin-top:8px;">Transparência total 🔍</div>
+      </div>
+      <div style="padding:24px;">
+        <p style="margin-top:0;">Olá, ${firstName}! 👋</p>
+        <p>Pra deixar o jogo limpo, <strong>todos os participantes estão recebendo este mesmo email</strong>: o PDF anexo reúne as apostas seladas de <strong>${input.totalPlayers} participante(s)</strong> do bolão — as suas e as de todo mundo.</p>
+        <div style="background:#f4f6f9; border-left:4px solid #009739; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">Por que isso?</strong><br/>
+          Os palpites estão selados e ninguém consegue mais editar. Com a cópia na mão de todo mundo, qualquer um pode conferir qualquer aposta durante a Copa. 🔒
+        </div>
+        <p>Guarde o PDF e acompanhe o <strong>ranking ao vivo</strong> a cada rodada. Que vença o melhor palpiteiro!</p>
+        <a href="${APP_URL}/apostas" style="display:inline-block; background:#009739; color:white; padding:12px 20px; text-decoration:none; font-weight:bold; margin-top:6px;">Ver o ranking →</a>
+        <div style="background:#f4f6f9; padding:16px; margin-top:18px; text-align:center;">
+          <p style="margin:0 0 10px; font-weight:bold; color:#002776;">A resenha da Copa rola no grupo do bolão 🍻⚽</p>
+          <a href="${WHATSAPP_GROUP_URL}" style="display:inline-block; background:#25D366; color:white; padding:12px 20px; text-decoration:none; font-weight:bold;">💬 Entrar no grupo do WhatsApp →</a>
+        </div>
+        <p style="color:#8092ab; font-size:12px; margin-top:20px;">Você recebe este email porque sua participação no Bolão da Copa 2026 está confirmada.</p>
+      </div>
+    </div>
+  `;
+
+  return send({
+    to: input.user_email,
+    subject,
+    html,
+    attachments: [
+      {
+        filename: `bolao26-apostas-consolidadas.pdf`,
         content: Buffer.from(input.pdfBytes),
       },
     ],

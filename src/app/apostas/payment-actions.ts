@@ -45,9 +45,28 @@ export async function submitPayment(formData: FormData): Promise<ActionResult> {
   ]);
 
   if ((predCount ?? 0) < (matchCount ?? 0)) {
+    // Nomeia os jogos sem palpite salvo — só dizer "faltam N" obrigava o
+    // apostador a caçar qual era (caso Douglas: tela 72/72, banco com 71).
+    const [{ data: preds }, { data: ms }, { data: ts }, { data: gs }] = await Promise.all([
+      supabase.from("predictions").select("match_id").eq("user_id", user.id),
+      supabase.from("matches").select("id, group_id, home_team_id, away_team_id"),
+      supabase.from("teams").select("id, name"),
+      supabase.from("groups").select("id, code"),
+    ]);
+    const have = new Set((preds ?? []).map((p) => p.match_id as string));
+    const teamName = new Map((ts ?? []).map((t) => [t.id as string, t.name as string]));
+    const groupCode = new Map((gs ?? []).map((g) => [g.id as string, g.code as string]));
+    const missing = (ms ?? [])
+      .filter((m) => !have.has(m.id as string))
+      .map(
+        (m) =>
+          `Grupo ${groupCode.get(m.group_id as string) ?? "?"}: ${teamName.get(m.home_team_id as string) ?? "?"} × ${teamName.get(m.away_team_id as string) ?? "?"}`,
+      );
+    const shown = missing.slice(0, 3).join(" · ");
+    const rest = missing.length > 3 ? ` e mais ${missing.length - 3} jogo(s)` : "";
     return {
       ok: false,
-      error: `Faltam ${(matchCount ?? 0) - (predCount ?? 0)} palpite(s) para ativar a aposta.`,
+      error: `Falta salvar ${missing.length} palpite(s): ${shown}${rest}. Redigite o placar desse(s) jogo(s) (vai aparecer "Salvo") e confirme de novo.`,
     };
   }
 

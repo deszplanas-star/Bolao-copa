@@ -89,6 +89,7 @@ export default function ApostasClient({
   });
   const [toast, setToast] = useState<string | null>(null);
   const [showPixModal, setShowPixModal] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submittingPayment, setSubmittingPayment] = useState(false);
   const [reopenSaving, setReopenSaving] = useState<Record<string, boolean>>({});
@@ -146,6 +147,10 @@ export default function ApostasClient({
   function isMatchFilled(matchId: string) {
     const d = drafts[matchId];
     if (!d) return false;
+    // Palpite cujo salvamento FALHOU não conta: contar o texto digitado
+    // mascarava o problema (tela mostrava 72/72 com 71 salvos no banco) e
+    // deixava o apostador tentar ativar a aposta com palpite faltando.
+    if (d.error) return false;
     return parseScore(d.home) !== null && parseScore(d.away) !== null;
   }
 
@@ -640,11 +645,17 @@ export default function ApostasClient({
           receiptFile={receiptFile}
           setReceiptFile={setReceiptFile}
           submitting={submittingPayment}
-          onClose={() => !submittingPayment && setShowPixModal(false)}
+          error={paymentError}
+          onClose={() => {
+            if (submittingPayment) return;
+            setShowPixModal(false);
+            setPaymentError(null);
+          }}
           onCopy={() => setToast("Chave Pix copiada")}
           onConfirm={async () => {
             if (!receiptFile) return;
             setSubmittingPayment(true);
+            setPaymentError(null);
             const fd = new FormData();
             fd.append("receipt", receiptFile);
             const res = await submitPayment(fd);
@@ -654,7 +665,9 @@ export default function ApostasClient({
               setReceiptFile(null);
               setToast("Pagamento enviado · aguardando aprovação");
             } else {
-              setToast(res.error);
+              // Erro fica FIXO dentro do modal — no toast ele sumia em
+              // segundos e o apostador ficava achando que travou.
+              setPaymentError(res.error);
             }
           }}
         />
@@ -1249,6 +1262,7 @@ function PixModal({
   receiptFile,
   setReceiptFile,
   submitting,
+  error,
   onClose,
   onCopy,
   onConfirm,
@@ -1256,6 +1270,7 @@ function PixModal({
   receiptFile: File | null;
   setReceiptFile: (f: File | null) => void;
   submitting: boolean;
+  error: string | null;
   onClose: () => void;
   onCopy: () => void;
   onConfirm: () => void;
@@ -1351,6 +1366,15 @@ function PixModal({
               </div>
             </label>
           </div>
+
+          {error && (
+            <div className="mt-4 text-left border-l-4 border-red-600 bg-red-50 px-4 py-3">
+              <div className="font-anton text-[12px] uppercase tracking-wider text-red-700">
+                Não foi possível ativar
+              </div>
+              <p className="font-serif text-[13px] text-ink mt-1">{error}</p>
+            </div>
+          )}
 
           <button
             onClick={onConfirm}
