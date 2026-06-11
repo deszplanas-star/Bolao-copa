@@ -11,6 +11,7 @@ import {
   sendConsolidatedBetsEmail,
   sendCountdownEmail,
   sendCzechFixNotice,
+  sendInstallAppEmail,
   sendTestEmail,
   sendUserApprovalNotification,
 } from "@/lib/email";
@@ -216,6 +217,48 @@ export async function sendConsolidatedBets(): Promise<BroadcastResult> {
   });
 
   return { ok: true, total: consolidated.players.length, sent, failed };
+}
+
+/**
+ * Convida TODOS os aprovados a instalar o PWA (app) com notificação de gol
+ * e chaveamento. Sem anexo — só o passo a passo por plataforma.
+ */
+export async function notifyInstallApp(): Promise<BroadcastResult> {
+  const admin = await getAuthedAdmin();
+  if (!admin) return { ok: false, error: "Acesso negado." };
+
+  const supabase = createClient();
+  const { data: rows, error } = await supabase
+    .from("payments")
+    .select("user_id")
+    .eq("status", "approved");
+  if (error) return { ok: false, error: error.message };
+
+  const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id as string)));
+  if (userIds.length === 0) return { ok: true, total: 0, sent: 0, failed: 0 };
+
+  const { data: users, error: uErr } = await supabase
+    .from("users")
+    .select("id, name, email")
+    .in("id", userIds);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  const recipients = (users ?? []).filter((u) => !!u.email);
+
+  const { sent, failed } = await runInChunks(recipients, 5, (u) =>
+    sendInstallAppEmail({
+      user_name: (u.name as string | null) ?? (u.email as string),
+      user_email: u.email as string,
+    }),
+  );
+
+  await logAdmin(admin.id, "broadcast.install_app", "user", admin.id, {
+    total: recipients.length,
+    sent,
+    failed,
+  });
+
+  return { ok: true, total: recipients.length, sent, failed };
 }
 
 /**

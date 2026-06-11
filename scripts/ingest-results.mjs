@@ -50,6 +50,26 @@ const TLA_TO_ISO = {
 const LIVE = new Set(["IN_PLAY", "PAUSED"]);
 const DONE = new Set(["FINISHED"]);
 
+// App em produção — o ingest avisa a rota /api/notify-goals (push de gol no
+// PWA). Auth: a própria service key, que o workflow já injeta.
+const APP_URL = process.env.APP_URL || "https://bolao-copa-pu3k.vercel.app";
+
+// Nome em pt-BR pra notificação e pro chaveamento (TLA da football-data).
+const TLA_TO_NAME = {
+  MEX: "México", CZE: "Rep. Tcheca", KOR: "Coreia do Sul", RSA: "África do Sul",
+  SUI: "Suíça", CAN: "Canadá", BIH: "Bósnia", QAT: "Catar",
+  BRA: "Brasil", MAR: "Marrocos", SCO: "Escócia", HAI: "Haiti",
+  USA: "Estados Unidos", PAR: "Paraguai", AUS: "Austrália", TUR: "Turquia",
+  GER: "Alemanha", ECU: "Equador", CIV: "Costa do Marfim", CUW: "Curaçau",
+  NED: "Holanda", JPN: "Japão", SWE: "Suécia", TUN: "Tunísia",
+  BEL: "Bélgica", EGY: "Egito", IRN: "Irã", NZL: "Nova Zelândia",
+  ESP: "Espanha", URY: "Uruguai", CPV: "Cabo Verde", KSA: "Arábia Saudita",
+  FRA: "França", NOR: "Noruega", SEN: "Senegal", IRQ: "Iraque",
+  ARG: "Argentina", AUT: "Áustria", ALG: "Argélia", JOR: "Jordânia",
+  POR: "Portugal", COL: "Colômbia", UZB: "Uzbequistão", COD: "RD Congo",
+  ENG: "Inglaterra", CRO: "Croácia", GHA: "Gana", PAN: "Panamá",
+};
+
 async function sb(path, init = {}) {
   const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
     ...init,
@@ -89,6 +109,42 @@ async function main() {
   let updated = 0;
   let skipped = 0;
   const problems = [];
+  const pushEvents = []; // notificações de gol/fim de jogo pro PWA
+
+  // ---- Fases eliminatórias → ko_matches (chaveamento, espelho da API) ----
+  let koUpserts = 0;
+  for (const am of apiMatches) {
+    if (am.stage === "GROUP_STAGE") continue;
+    const homeTla = am.homeTeam?.tla ?? null;
+    const awayTla = am.awayTeam?.tla ?? null;
+    const row = {
+      fd_id: am.id,
+      stage: am.stage,
+      home_name: homeTla ? (TLA_TO_NAME[homeTla] ?? am.homeTeam?.name) : null,
+      away_name: awayTla ? (TLA_TO_NAME[awayTla] ?? am.awayTeam?.name) : null,
+      home_iso: homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null,
+      away_iso: awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null,
+      kickoff_at: am.utcDate ?? null,
+      home_score: am.score?.fullTime?.home ?? null,
+      away_score: am.score?.fullTime?.away ?? null,
+      pen_home: am.score?.penalties?.home ?? null,
+      pen_away: am.score?.penalties?.away ?? null,
+      status: DONE.has(am.status) ? "finished" : LIVE.has(am.status) ? "live" : "scheduled",
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await sb("ko_matches?on_conflict=fd_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify(row),
+      });
+      koUpserts++;
+    } catch (e) {
+      // Tabela ainda não criada (migration 0005) — segue a vida, só avisa.
+      problems.push(`ko_matches: ${e.message.slice(0, 120)}`);
+      break;
+    }
+  }
 
   for (const am of apiMatches) {
     if (am.stage !== "GROUP_STAGE") continue;
@@ -142,9 +198,47 @@ async function main() {
     console.log(
       `✓ ${isoHome} ${ourHome}x${ourAway} ${isoAway} [${am.status}${isDone ? "→finished" : ""}]`,
     );
+
+    // Notificação: gol (placar mudou em jogo ao vivo) ou apito final.
+    const homeName = TLA_TO_NAME[am.homeTeam?.tla] ?? am.homeTeam?.name ?? "?";
+    const awayName = TLA_TO_NAME[am.awayTeam?.tla] ?? am.awayTeam?.name ?? "?";
+    const scoreChanged = ours.home_score !== ourHome || ours.away_score !== ourAway;
+    if (isDone) {
+      pushEvents.push({
+        title: "Fim de jogo! 🏁",
+        body: `${homeName} ${hs} × ${as} ${awayName} — confira seus pontos no ranking`,
+        tag: `fim-${am.id}`,
+      });
+    } else if (scoreChanged) {
+      pushEvents.push({
+        title: "GOL! ⚽",
+        body: `${homeName} ${hs} × ${as} ${awayName}`,
+        tag: `gol-${am.id}`,
+      });
+    }
   }
 
-  console.log(`\nResumo: ${updated} atualizado(s), ${skipped} sem mudança.`);
+  // ---- Push pro PWA (rota autenticada com a própria service key) ----
+  if (pushEvents.length > 0) {
+    try {
+      const res = await fetch(`${APP_URL}/api/notify-goals`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${SB_KEY}`,
+        },
+        body: JSON.stringify({ events: pushEvents }),
+      });
+      const out = await res.json().catch(() => ({}));
+      console.log(`Push: ${res.status} ${JSON.stringify(out)}`);
+    } catch (e) {
+      console.log(`Push falhou (segue sem notificar): ${e.message}`);
+    }
+  }
+
+  console.log(
+    `\nResumo: ${updated} atualizado(s), ${skipped} sem mudança, ${koUpserts} jogo(s) de mata-mata, ${pushEvents.length} notificação(ões).`,
+  );
   if (problems.length) console.log("Avisos:\n- " + problems.join("\n- "));
 }
 

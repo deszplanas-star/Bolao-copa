@@ -9,6 +9,7 @@ import {
   lockReopenedMatches,
   notifyCountdown,
   notifyCzechFix,
+  notifyInstallApp,
   resendApprovedPdfs,
   sendAdminTestEmail,
   sendConsolidatedBets,
@@ -667,7 +668,7 @@ function ComunicacaoTab({
 }) {
   const [pending, startTransition] = useTransition();
   const [confirm, setConfirm] = useState<
-    null | "pdf" | "czech" | "countdown" | "consolidado"
+    null | "pdf" | "czech" | "countdown" | "consolidado" | "app"
   >(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [testing, startTestTransition] = useTransition();
@@ -699,7 +700,7 @@ function ComunicacaoTab({
     });
   }
 
-  function run(kind: "pdf" | "czech" | "countdown" | "consolidado") {
+  function run(kind: "pdf" | "czech" | "countdown" | "consolidado" | "app") {
     startTransition(async () => {
       const res =
         kind === "pdf"
@@ -708,7 +709,9 @@ function ComunicacaoTab({
             ? await notifyCzechFix()
             : kind === "countdown"
               ? await notifyCountdown()
-              : await sendConsolidatedBets();
+              : kind === "app"
+                ? await notifyInstallApp()
+                : await sendConsolidatedBets();
       setConfirm(null);
       if (!res.ok) {
         onToast(res.error);
@@ -783,6 +786,28 @@ function ComunicacaoTab({
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
+        {/* Convite: instalar o app (PWA) */}
+        <div className="border-2 border-green p-5 flex flex-col">
+          <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
+            Convite: instalar o app 📲
+          </div>
+          <p className="font-serif italic text-sm text-soft flex-1">
+            Envia o passo a passo pra instalar o bolão como app no celular
+            (Android e iPhone), ativar a <b>notificação a cada gol</b> e
+            conhecer o <b>chaveamento</b> do mata-mata.
+          </p>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute my-3">
+            Destinatários: <b className="text-ink">{approvedCount}</b> aprovado(s)
+          </div>
+          <button
+            onClick={() => setConfirm("app")}
+            disabled={pending || approvedCount === 0}
+            className="px-4 py-2.5 bg-green text-paper font-anton text-[12px] uppercase tracking-wider border-2 border-green hover:bg-green2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {pending ? "Processando..." : "Enviar convite do app"}
+          </button>
+        </div>
+
         {/* Consolidado: todas as apostas pra todos */}
         <div className="border-2 border-green p-5 flex flex-col">
           <div className="font-anton text-xl uppercase tracking-tight text-ink mb-1">
@@ -893,7 +918,9 @@ function ComunicacaoTab({
                     ? `Enviar o email de contagem regressiva pra estreia, com o PDF dos palpites em anexo, para ${approvedCount} apostador(es) aprovado(s)?`
                     : confirm === "consolidado"
                       ? `Enviar o PDF consolidado com as apostas de TODOS os participantes para ${approvedCount} apostador(es) aprovado(s)? Cada um recebe o mesmo PDF com tudo.`
-                      : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
+                      : confirm === "app"
+                        ? `Enviar o convite pra instalar o app (com notificação de gol e chaveamento) para ${approvedCount} apostador(es) aprovado(s)?`
+                        : "Enviar o aviso de correção do Grupo A para todos que têm palpite nos jogos reabertos? Cada pessoa recebe um email."}
               </p>
               <div className="flex justify-end gap-2">
                 <button

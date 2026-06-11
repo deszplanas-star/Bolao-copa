@@ -6,6 +6,7 @@ import { computeStandings } from "@/lib/standings";
 import { isReopenWindowOpen } from "@/lib/reopen";
 import { deletePrediction, upsertPrediction } from "./actions";
 import { submitPayment } from "./payment-actions";
+import PushBell from "@/components/PushBell";
 
 type Draft = { home: string; away: string; saving?: boolean; error?: string | null };
 type DraftMap = Record<string, Draft>;
@@ -312,8 +313,11 @@ export default function ApostasClient({
             <span className="opacity-40 mx-1.5">/</span>
             <span className="text-yellow">grupo-{currentGroup.toLowerCase()}</span>
           </div>
-          <div className="hidden sm:block font-mono text-[11px] uppercase tracking-widest text-green">
-            {user.name}
+          <div className="flex items-center gap-3 justify-end">
+            <PushBell onToast={setToast} />
+            <span className="hidden sm:block font-mono text-[11px] uppercase tracking-widest text-green">
+              {user.name}
+            </span>
           </div>
         </div>
       </header>
@@ -345,6 +349,12 @@ export default function ApostasClient({
               )}
             </button>
           ))}
+          <a
+            href="/chaveamento"
+            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
+          >
+            Chaveamento
+          </a>
           <div className="flex-1" />
           {tab === "apostas" && (
             <div className="flex gap-0.5 items-center pr-4">

@@ -277,6 +277,57 @@ export async function sendConsolidatedBetsEmail(input: {
 }
 
 /**
+ * Convite pra instalar o PWA (o "app" do bolão) com passo a passo por
+ * plataforma + ativar notificação de gol + chaveamento. Sem anexo.
+ */
+export async function sendInstallAppEmail(input: {
+  user_name: string;
+  user_email: string;
+}): Promise<boolean> {
+  const firstName = escapeHtml(input.user_name.split(" ")[0]);
+  const subject = `📲 Instale o app do Bolão — gol por gol no seu celular`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #d2dae5;">
+      <div style="background:#002776; padding:28px 24px; text-align:center;">
+        <div style="font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#FFDF00; font-weight:bold;">Bolão da Copa · 2026</div>
+        <div style="color:#ffffff; font-size:26px; font-weight:800; margin-top:8px;">O bolão virou app 📲</div>
+      </div>
+      <div style="padding:24px;">
+        <p style="margin-top:0;">Olá, ${firstName}! 👋</p>
+        <p>Agora dá pra usar o bolão <strong>como um aplicativo</strong> no seu celular: ícone na tela, abre direto, <strong>notificação a cada gol</strong> e o <strong>chaveamento do mata-mata</strong> pra acompanhar a Copa inteira. Você loga com o Google uma vez e pronto.</p>
+
+        <div style="background:#f4f6f9; border-left:4px solid #009739; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">📱 Android (Chrome)</strong><br/>
+          1. Abra <a href="${APP_URL}/apostas" style="color:#009739; font-weight:bold;">o bolão</a> no Chrome<br/>
+          2. Toque no menu <strong>⋮</strong> → <strong>"Instalar app"</strong> (ou no aviso que aparece)<br/>
+          3. Abra o app e toque em <strong>🔕 Gols</strong> no topo pra ativar as notificações
+        </div>
+
+        <div style="background:#f4f6f9; border-left:4px solid #002776; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">🍎 iPhone (Safari)</strong><br/>
+          1. Abra <a href="${APP_URL}/apostas" style="color:#009739; font-weight:bold;">o bolão</a> no Safari<br/>
+          2. Toque em <strong>Compartilhar</strong> (quadrado com seta) → <strong>"Adicionar à Tela de Início"</strong><br/>
+          3. Abra <strong>pelo ícone novo</strong> e toque em <strong>🔕 Gols</strong> — no iPhone a notificação só funciona pelo app instalado
+        </div>
+
+        <p><strong>Novidade:</strong> aba <a href="${APP_URL}/chaveamento" style="color:#009739; font-weight:bold;">Chaveamento</a> — o mata-mata completo, atualizado em tempo real conforme os classificados forem definidos.</p>
+
+        <a href="${APP_URL}/apostas" style="display:inline-block; background:#009739; color:white; padding:12px 20px; text-decoration:none; font-weight:bold; margin-top:6px;">Abrir o bolão →</a>
+
+        <div style="background:#f4f6f9; padding:16px; margin-top:18px; text-align:center;">
+          <p style="margin:0 0 10px; font-weight:bold; color:#002776;">A resenha da Copa rola no grupo do bolão 🍻⚽</p>
+          <a href="${WHATSAPP_GROUP_URL}" style="display:inline-block; background:#25D366; color:white; padding:12px 20px; text-decoration:none; font-weight:bold;">💬 Entrar no grupo do WhatsApp →</a>
+        </div>
+
+        <p style="color:#8092ab; font-size:12px; margin-top:20px;">Você recebe este email porque sua participação no Bolão da Copa 2026 está confirmada.</p>
+      </div>
+    </div>
+  `;
+
+  return send({ to: input.user_email, subject, html });
+}
+
+/**
  * Envia um email de teste APENAS para o admin (adminEmail). Não usa PDF nem
  * depende de role/RLS — serve só pra provar que o transporte Gmail SMTP está
  * funcionando no ambiente de produção. Devolve o motivo exato em caso de falha
