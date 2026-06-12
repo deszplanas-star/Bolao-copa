@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { Group, MatchView, RankingRow, Team } from "@/lib/types";
 import { computeStandings } from "@/lib/standings";
 import { isReopenWindowOpen } from "@/lib/reopen";
@@ -976,7 +977,7 @@ function calcPrizes(rankings: RankingRow[]): Map<string, number> {
 
     const slotsUsed = Math.min(tied.length, 3 - slot);
     let combined = 0;
-    for (let i = slot; i < slot + slotsUsed; i++) combined += Math.round(TOP_PCT[i] * remaining);
+    for (let i = slot; i < slot + slotsUsed; i++) combined += Math.floor(TOP_PCT[i] * remaining);
     const share = Math.floor(combined / tied.length);
     for (const p of tied) if (!prizes.has(p.user_id)) prizes.set(p.user_id, share);
     slot += slotsUsed;
@@ -1030,7 +1031,7 @@ function RankingTab({
 
   return (
     <div className="max-w-[860px] mx-auto px-8 py-10">
-      <div className="flex items-baseline justify-between mb-1">
+      <div className="flex items-baseline justify-between mb-6">
         <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
           Ranking <span className="text-green">geral</span>
         </h2>
@@ -1038,9 +1039,6 @@ function RankingTab({
           {rankings.length} {rankings.length === 1 ? "participante" : "participantes"}
         </span>
       </div>
-      <p className="font-serif italic text-sm text-green mb-6">
-        Bolão do Planinhas tá d+++ 🔥 — que vença o melhor (ou o mais sortudo)
-      </p>
 
       <div className="border-2 border-ink">
         <table className="w-full border-collapse">
@@ -1096,11 +1094,29 @@ function RankingTab({
                         </span>
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink flex items-center flex-wrap gap-x-1.5 min-w-0">
-                        <span>
-                          {r.position === 1 && "👑 "}
-                          {r.position === maxPos && rankings.length > 1 && "🤡 "}
-                          {r.name ?? "Sem nome"}
-                        </span>
+                        {r.position === 1 && (
+                          <span className="relative inline-flex flex-shrink-0">
+                            <button type="button" className="cursor-help text-base leading-none" onClick={() => setTipFor(tipFor === `${r.user_id}:crown` ? null : `${r.user_id}:crown`)}>👑</button>
+                            {tipFor === `${r.user_id}:crown` && (
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-ink text-paper font-serif normal-case tracking-normal text-[11px] leading-snug px-3 py-2 text-center z-30 shadow-lg">
+                                Rei do pitaco 🏆
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-ink" />
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {r.position === maxPos && rankings.length > 1 && (
+                          <span className="relative inline-flex flex-shrink-0">
+                            <button type="button" className="cursor-help text-base leading-none" onClick={() => setTipFor(tipFor === `${r.user_id}:clown` ? null : `${r.user_id}:clown`)}>🤡</button>
+                            {tipFor === `${r.user_id}:clown` && (
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-ink text-paper font-serif normal-case tracking-normal text-[11px] leading-snug px-3 py-2 text-center z-30 shadow-lg">
+                                Parabéns pela participação 🎉
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-ink" />
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        <Link href={`/apostas/${r.user_id}`} className="hover:text-green transition-colors">{r.name ?? "Sem nome"}</Link>
                         {(r.penalty_points ?? 0) > 0 && (
                           <span className="relative inline-flex flex-shrink-0">
                             <button
@@ -1214,10 +1230,25 @@ function liveClock(kickoffIso: string, nowMs: number): string {
   return "acréscimos";
 }
 
+type MatchPred = { userId: string; name: string; avatar_url: string | null; home_score: number; away_score: number; points: number; computed: boolean };
+
 function ResultadosTab({ matches }: { matches: MatchView[] }) {
-  // Jogo "ao vivo" = horário do apito já passou e ainda não foi encerrado
-  // (janela de 3h cobre acréscimos). O placar parcial vem do ingest (1 min).
   const nowMs = Date.now();
+  const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  const [matchPreds, setMatchPreds] = useState<MatchPred[] | null>(null);
+  const [predLoading, setPredLoading] = useState(false);
+
+  useEffect(() => {
+    if (!openMatchId) { setMatchPreds(null); return; }
+    setPredLoading(true);
+    fetch(`/api/match-predictions/${openMatchId}`)
+      .then((r) => r.json())
+      .then((d) => { setMatchPreds(d.predictions ?? []); setPredLoading(false); })
+      .catch(() => { setMatchPreds([]); setPredLoading(false); });
+  }, [openMatchId]);
+
+  const openMatch = openMatchId ? matches.find((m) => m.id === openMatchId) : null;
+
   const live = matches.filter((m) => {
     if (m.status === "finished") return false;
     const ko = new Date(m.kickoff_at).getTime();
@@ -1271,7 +1302,11 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
           return (
             <div
               key={m.id}
-              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"
+              className={[
+                "border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3",
+                !isLive ? "cursor-pointer hover:border-ink transition-colors" : "",
+              ].join(" ")}
+              onClick={!isLive ? () => setOpenMatchId(m.id) : undefined}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <img
@@ -1350,6 +1385,55 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
           );
         })}
       </div>
+      <p className="mt-4 font-serif italic text-xs text-soft">Toque num jogo encerrado para ver quem cravou.</p>
+
+      {/* Popup quem cravou */}
+      {openMatchId && (
+        <div className="fixed inset-0 bg-ink/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setOpenMatchId(null)}>
+          <div className="bg-paper w-full sm:max-w-sm max-h-[80vh] overflow-y-auto border-t-4 sm:border-4 border-ink" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-rule flex items-center justify-between sticky top-0 bg-paper z-10">
+              <div>
+                <p className="font-anton uppercase text-base text-ink">Quem cravou</p>
+                {openMatch && (
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-mute">
+                    {openMatch.home.name} {openMatch.home_score} × {openMatch.away_score} {openMatch.away.name}
+                  </p>
+                )}
+              </div>
+              <button type="button" className="font-anton text-xl text-mute hover:text-ink leading-none" onClick={() => setOpenMatchId(null)}>×</button>
+            </div>
+            <div className="divide-y divide-rule">
+              {predLoading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
+              {!predLoading && matchPreds && matchPreds.length === 0 && (
+                <div className="p-6 text-center font-mono text-xs text-mute">ninguém apostou neste jogo</div>
+              )}
+              {!predLoading && matchPreds && matchPreds.map((p) => (
+                <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {p.avatar_url ? (
+                      <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute flex-shrink-0">
+                        {(p.name ?? "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="font-anton uppercase tracking-tight text-sm truncate">{p.name ?? "?"}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="font-mono text-sm whitespace-nowrap">{p.home_score} × {p.away_score}</span>
+                    <span className={[
+                      "font-anton text-[10px] px-1.5 py-0.5 whitespace-nowrap",
+                      p.points === 3 ? "bg-green text-paper" : p.points === 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
+                    ].join(" ")}>
+                      {p.points === 3 ? "🎯 +3" : p.points === 1 ? "+1" : "0"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

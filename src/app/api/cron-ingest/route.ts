@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPushEvents, type PushEvent } from "@/lib/push";
+import { sendPushEvents, sendPushToUsers, type PushEvent } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -218,6 +218,30 @@ async function run(req: NextRequest) {
 
   let push: unknown = null;
   if (pushEvents.length > 0) push = await sendPushEvents(pushEvents);
+
+  // BROCOU! — push dirigido para quem cravou nos jogos que encerraram agora
+  const finishedMatchIds = pushEvents
+    .filter((e) => e.tag?.startsWith("fim-"))
+    .map((e) => e.tag!.replace("fim-", ""));
+
+  if (finishedMatchIds.length > 0) {
+    for (const matchId of finishedMatchIds) {
+      const { data: cravadores } = await db
+        .from("predictions")
+        .select("user_id")
+        .eq("match_id", matchId)
+        .eq("points", 3);
+      const userIds = (cravadores ?? []).map((c) => c.user_id as string);
+      if (userIds.length > 0) {
+        await sendPushToUsers(userIds, {
+          title: "BROCOU! 🎯",
+          body: `Bolão do Planinhas — você cravou o placar exato! Veja o ranking.`,
+          tag: `brocou-${matchId}`,
+          url: "/apostas?tab=ranking",
+        });
+      }
+    }
+  }
 
   return NextResponse.json({
     updated,

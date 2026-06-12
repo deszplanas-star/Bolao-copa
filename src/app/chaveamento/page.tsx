@@ -135,19 +135,35 @@ export default async function ChaveamentoPage() {
   return (
     <div className="min-h-screen bg-paper">
       <header className="bg-ink text-paper border-b-4 border-green">
-        <div className="max-w-[1280px] mx-auto px-8 h-14 flex items-center justify-between">
+        <div className="max-w-[1280px] mx-auto px-8 h-14 flex items-center">
           <div className="flex items-center gap-2 font-anton uppercase tracking-wider text-base">
             <span className="w-2 h-2 bg-green rounded-full animate-pulse" />
             Bolão do Planinhas
           </div>
-          <Link
-            href="/apostas"
-            className="font-mono text-[11px] uppercase tracking-widest text-paper/70 hover:text-yellow"
-          >
-            ← Voltar pras apostas
-          </Link>
         </div>
       </header>
+
+      <nav className="bg-paper border-b border-rule sticky top-0 z-20 overflow-x-auto">
+        <div className="max-w-[1280px] mx-auto px-8 flex">
+          {[
+            { href: "/apostas?tab=apostas", label: "Apostas" },
+            { href: "/apostas?tab=ranking", label: "Ranking" },
+            { href: "/apostas?tab=resultados", label: "Resultados" },
+            { href: "/apostas?tab=minhas", label: "Minhas apostas" },
+          ].map((t) => (
+            <Link
+              key={t.href}
+              href={t.href}
+              className="flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-mute hover:text-ink border-b-2 border-transparent hover:border-ink transition-colors"
+            >
+              {t.label}
+            </Link>
+          ))}
+          <span className="flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-green border-b-2 border-green">
+            Chaveamento
+          </span>
+        </div>
+      </nav>
 
       <main className="max-w-[1280px] mx-auto px-8 py-8">
         <h1 className="font-anton text-4xl uppercase tracking-tight text-ink">
