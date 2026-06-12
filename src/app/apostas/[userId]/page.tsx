@@ -73,11 +73,11 @@ export default async function ApostasUserPage({
   const partialHits = resolved.filter((m) => m.prediction?.points === 1).length;
 
   const navTabs = [
-    { href: "/apostas?tab=apostas", label: "Apostas" },
-    { href: "/apostas?tab=ranking", label: "Ranking" },
-    { href: "/apostas?tab=resultados", label: "Resultados" },
-    { href: "/apostas?tab=minhas", label: "Minhas apostas" },
-    { href: "/chaveamento", label: "Chaveamento" },
+    { href: "/apostas?tab=apostas", label: "Apostas", active: false },
+    { href: "/apostas?tab=ranking", label: "Ranking", active: true },
+    { href: "/apostas?tab=resultados", label: "Resultados", active: false },
+    { href: "/apostas?tab=minhas", label: "Minhas apostas", active: false },
+    { href: "/chaveamento", label: "Chaveamento", active: false },
   ];
 
   return (
@@ -97,7 +97,12 @@ export default async function ApostasUserPage({
             <Link
               key={t.href}
               href={t.href}
-              className="flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-mute hover:text-ink border-b-2 border-transparent hover:border-ink transition-colors"
+              className={[
+                "flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest border-b-2 transition-colors",
+                t.active
+                  ? "text-ink border-ink font-bold"
+                  : "text-mute border-transparent hover:text-ink hover:border-ink",
+              ].join(" ")}
             >
               {t.label}
             </Link>
