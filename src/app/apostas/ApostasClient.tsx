@@ -1005,6 +1005,7 @@ function RankingTab({
   totalMatches: number;
 }) {
   const prizes = calcPrizes(rankings);
+  const maxPos = rankings.length > 0 ? Math.max(...rankings.map((r) => r.position)) : 0;
 
   // Tooltip dos badges (punição/entrada tardia): ancorado ACIMA, some em 4s
   const [tipFor, setTipFor] = useState<string | null>(null);
@@ -1077,14 +1078,9 @@ function RankingTab({
                   ].join(" ")}
                 >
                   <td className="py-3 px-3 font-anton text-base">
-                    {(() => {
-                      const maxPos = Math.max(...rankings.map((x) => x.position));
-                      if (r.position === 1) return <span title="Rei do pitaco 👑" className="text-green">👑 1º</span>;
-                      if (r.position === 2) return <span className="text-green">2º</span>;
-                      if (r.position === 3) return <span className="text-green">3º</span>;
-                      if (r.position === maxPos) return <span title="Parabéns pela participação 🤡" className="text-amber-600">🤡 {r.position}º</span>;
-                      return <span className="text-mute">{r.position}º</span>;
-                    })()}
+                    <span className={r.position <= 3 ? "text-green" : "text-mute"}>
+                      {r.position}º
+                    </span>
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2.5">
@@ -1100,7 +1096,11 @@ function RankingTab({
                         </span>
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink flex items-center flex-wrap gap-x-1.5 min-w-0">
-                        <span>{r.name ?? "Sem nome"}</span>
+                        <span>
+                          {r.position === 1 && "👑 "}
+                          {r.position === maxPos && rankings.length > 1 && "🤡 "}
+                          {r.name ?? "Sem nome"}
+                        </span>
                         {(r.penalty_points ?? 0) > 0 && (
                           <span className="relative inline-flex flex-shrink-0">
                             <button
@@ -1176,16 +1176,13 @@ function RankingTab({
                     {r.total_points}
                   </td>
                   <td className="py-3 px-3 text-right font-mono text-xs whitespace-nowrap">
-                    {(() => {
-                      const amt = prizes.get(r.user_id) ?? 0;
-                      const maxPos = Math.max(...rankings.map((x) => x.position));
-                      const isLast = r.position === maxPos;
-                      return (
-                        <span className={amt > 0 ? (isLast ? "text-amber-600 font-bold" : "text-green font-bold") : "text-mute"}>
-                          {fmtPrize(amt)}
-                        </span>
-                      );
-                    })()}
+                    <span className={
+                      (prizes.get(r.user_id) ?? 0) > 0
+                        ? r.position === maxPos ? "text-amber-600 font-bold" : "text-green font-bold"
+                        : "text-mute"
+                    }>
+                      {fmtPrize(prizes.get(r.user_id) ?? 0)}
+                    </span>
                   </td>
                 </tr>
               );
