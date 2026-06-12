@@ -20,7 +20,8 @@ export async function GET(
   const { data, error } = await db
     .from("predictions")
     .select("home_score, away_score, points, computed_at, user_id")
-    .eq("match_id", params.matchId);
+    .eq("match_id", params.matchId)
+    .eq("points", 3);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) return NextResponse.json({ predictions: [] });

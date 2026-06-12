@@ -1405,7 +1405,7 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
             <div className="divide-y divide-rule">
               {predLoading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
               {!predLoading && matchPreds && matchPreds.length === 0 && (
-                <div className="p-6 text-center font-mono text-xs text-mute">ninguém apostou neste jogo</div>
+                <div className="p-6 text-center font-mono text-xs text-mute">ninguém cravou esse jogo 😅</div>
               )}
               {!predLoading && matchPreds && matchPreds.map((p) => (
                 <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
