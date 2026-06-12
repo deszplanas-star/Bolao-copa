@@ -174,6 +174,15 @@ export default function ApostasClient({
   }
 
   const totalFilled = matches.reduce((s, m) => (isMatchFilled(m.id) ? s + 1 : s), 0);
+
+  // Total EXIGIDO pra ativar: jogos ainda abertos + os que a pessoa já
+  // preencheu. Quem entra depois de um jogo travado (ex.: entrou durante a
+  // abertura) participa com um palpite a menos — o jogo perdido vale 0.
+  const CUTOFF_CLIENT_MS = 5 * 60 * 1000;
+  const requiredTotal = matches.reduce((s, m) => {
+    const open = new Date(m.kickoff_at).getTime() - now > CUTOFF_CLIENT_MS;
+    return open || isMatchFilled(m.id) ? s + 1 : s;
+  }, 0);
   const groupFilledCount = (groupId: string) =>
     (matchesByGroup.get(groupId) ?? []).reduce(
       (s, m) => (isMatchFilled(m.id) ? s + 1 : s),
@@ -362,7 +371,7 @@ export default function ApostasClient({
                     tab === "apostas" ? "bg-green text-paper" : "bg-paper3 text-ink",
                   ].join(" ")}
                 >
-                  {totalFilled}/{matches.length}
+                  {totalFilled}/{requiredTotal}
                 </span>
               )}
             </button>
@@ -660,7 +669,7 @@ export default function ApostasClient({
           </div>
           <CTAButton
             totalFilled={totalFilled}
-            totalMatches={matches.length}
+            totalMatches={requiredTotal}
             paymentStatus={paymentStatus}
             onClick={() => setShowPixModal(true)}
           />

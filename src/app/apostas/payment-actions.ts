@@ -35,33 +35,38 @@ export async function submitPayment(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "Formato inválido — use PNG, JPG, WEBP ou PDF." };
   }
 
-  // Trava: precisa ter os 72 palpites preenchidos
-  const [{ count: predCount }, { count: matchCount }] = await Promise.all([
-    supabase
-      .from("predictions")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id),
-    supabase.from("matches").select("*", { count: "exact", head: true }),
+  // Trava: precisa ter palpite em todos os jogos AINDA ABERTOS (kickoff a
+  // mais de 5 min). Jogos já travados não contam — quem entra atrasado
+  // participa com um palpite a menos e marca 0 naquele jogo.
+  const CUTOFF_MS = 5 * 60 * 1000;
+  const [{ data: preds }, { data: ms }] = await Promise.all([
+    supabase.from("predictions").select("match_id").eq("user_id", user.id),
+    supabase.from("matches").select("id, group_id, home_team_id, away_team_id, kickoff_at"),
   ]);
+  const have = new Set((preds ?? []).map((p) => p.match_id as string));
+  const nowMs = Date.now();
+  const missingOpen = (ms ?? []).filter(
+    (m) =>
+      !have.has(m.id as string) &&
+      new Date(m.kickoff_at as string).getTime() - nowMs > CUTOFF_MS,
+  );
 
-  if ((predCount ?? 0) < (matchCount ?? 0)) {
+  if ((have.size === 0 && missingOpen.length === 0) || missingOpen.length > 0) {
+    if (have.size === 0 && missingOpen.length === 0) {
+      return { ok: false, error: "Nenhum jogo aberto pra apostar no momento." };
+    }
     // Nomeia os jogos sem palpite salvo — só dizer "faltam N" obrigava o
     // apostador a caçar qual era (caso Douglas: tela 72/72, banco com 71).
-    const [{ data: preds }, { data: ms }, { data: ts }, { data: gs }] = await Promise.all([
-      supabase.from("predictions").select("match_id").eq("user_id", user.id),
-      supabase.from("matches").select("id, group_id, home_team_id, away_team_id"),
+    const [{ data: ts }, { data: gs }] = await Promise.all([
       supabase.from("teams").select("id, name"),
       supabase.from("groups").select("id, code"),
     ]);
-    const have = new Set((preds ?? []).map((p) => p.match_id as string));
     const teamName = new Map((ts ?? []).map((t) => [t.id as string, t.name as string]));
     const groupCode = new Map((gs ?? []).map((g) => [g.id as string, g.code as string]));
-    const missing = (ms ?? [])
-      .filter((m) => !have.has(m.id as string))
-      .map(
-        (m) =>
-          `Grupo ${groupCode.get(m.group_id as string) ?? "?"}: ${teamName.get(m.home_team_id as string) ?? "?"} × ${teamName.get(m.away_team_id as string) ?? "?"}`,
-      );
+    const missing = missingOpen.map(
+      (m) =>
+        `Grupo ${groupCode.get(m.group_id as string) ?? "?"}: ${teamName.get(m.home_team_id as string) ?? "?"} × ${teamName.get(m.away_team_id as string) ?? "?"}`,
+    );
     const shown = missing.slice(0, 3).join(" · ");
     const rest = missing.length > 3 ? ` e mais ${missing.length - 3} jogo(s)` : "";
     return {
