@@ -693,18 +693,28 @@ export default function ApostasClient({
             if (!receiptFile) return;
             setSubmittingPayment(true);
             setPaymentError(null);
-            const fd = new FormData();
-            fd.append("receipt", receiptFile);
-            const res = await submitPayment(fd);
-            setSubmittingPayment(false);
-            if (res.ok) {
-              setShowPixModal(false);
-              setReceiptFile(null);
-              setToast("Pagamento enviado · aguardando aprovação");
-            } else {
-              // Erro fica FIXO dentro do modal — no toast ele sumia em
-              // segundos e o apostador ficava achando que travou.
-              setPaymentError(res.error);
+            try {
+              const fd = new FormData();
+              fd.append("receipt", receiptFile);
+              const res = await submitPayment(fd);
+              if (res.ok) {
+                setShowPixModal(false);
+                setReceiptFile(null);
+                setToast("Pagamento enviado · aguardando aprovação");
+              } else {
+                // Erro fica FIXO dentro do modal — no toast ele sumia em
+                // segundos e o apostador ficava achando que travou.
+                setPaymentError(res.error);
+              }
+            } catch (e) {
+              // Sem isto, uma exceção (ex.: comprovante maior que o limite
+              // do servidor) deixava o botão preso em "Enviando..." pra sempre.
+              console.error("[pix] submit falhou", e);
+              setPaymentError(
+                "O envio falhou no caminho — pode ser o tamanho do comprovante ou a conexão. Tente um arquivo menor (print da tela resolve) ou tente de novo.",
+              );
+            } finally {
+              setSubmittingPayment(false);
             }
           }}
         />
