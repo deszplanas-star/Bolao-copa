@@ -333,7 +333,7 @@ export default function ApostasClient({
         <div className="max-w-[1280px] mx-auto px-8 h-14 grid grid-cols-[auto_1fr_auto] items-center gap-6">
           <div className="flex items-center gap-2 font-anton uppercase tracking-wider text-base">
             <span className="w-2 h-2 bg-green rounded-full animate-pulse" />
-            Bolão / 26
+            Bolão do Planinhas
           </div>
           <div className="hidden md:block text-center font-mono text-[11px] uppercase tracking-widest text-paper/70">
             bolaocopa26.com <span className="opacity-40 mx-1.5">/</span> apostas{" "}
@@ -947,6 +947,54 @@ function EmptyTab({ title, text }: { title: React.ReactNode; text: string }) {
   );
 }
 
+const ENTRY_CENTS = 50_00; // R$50 por apostador
+
+function calcPrizes(rankings: RankingRow[]): Map<string, number> {
+  const n = rankings.length;
+  if (n < 1) return new Map();
+
+  const pool = n * ENTRY_CENTS;
+  const lastPrize = ENTRY_CENTS;
+  const remaining = pool - lastPrize;
+  const TOP_PCT = [0.70, 0.20, 0.10];
+
+  const maxPos = Math.max(...rankings.map((r) => r.position));
+  const lastPlayers = rankings.filter((r) => r.position === maxPos);
+
+  const prizes = new Map<string, number>();
+
+  // Último(s): dividem R$50 igualmente
+  const lastShare = Math.floor(lastPrize / lastPlayers.length);
+  for (const p of lastPlayers) prizes.set(p.user_id, lastShare);
+
+  // Top 3: empates agrupam as fatias combinadas
+  let slot = 0;
+  while (slot < 3 && remaining > 0) {
+    const pos = slot + 1;
+    const tied = rankings.filter((r) => r.position === pos);
+    if (tied.length === 0) { slot++; continue; }
+
+    const slotsUsed = Math.min(tied.length, 3 - slot);
+    let combined = 0;
+    for (let i = slot; i < slot + slotsUsed; i++) combined += Math.round(TOP_PCT[i] * remaining);
+    const share = Math.floor(combined / tied.length);
+    for (const p of tied) if (!prizes.has(p.user_id)) prizes.set(p.user_id, share);
+    slot += slotsUsed;
+  }
+
+  return prizes;
+}
+
+function fmtPrize(cents: number): string {
+  if (cents === 0) return "—";
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
 function RankingTab({
   rankings,
   currentUserId,
@@ -956,6 +1004,8 @@ function RankingTab({
   currentUserId: string;
   totalMatches: number;
 }) {
+  const prizes = calcPrizes(rankings);
+
   // Tooltip dos badges (punição/entrada tardia): ancorado ACIMA, some em 4s
   const [tipFor, setTipFor] = useState<string | null>(null);
   useEffect(() => {
@@ -979,7 +1029,7 @@ function RankingTab({
 
   return (
     <div className="max-w-[860px] mx-auto px-8 py-10">
-      <div className="flex items-baseline justify-between mb-6">
+      <div className="flex items-baseline justify-between mb-1">
         <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
           Ranking <span className="text-green">geral</span>
         </h2>
@@ -987,6 +1037,9 @@ function RankingTab({
           {rankings.length} {rankings.length === 1 ? "participante" : "participantes"}
         </span>
       </div>
+      <p className="font-serif italic text-sm text-green mb-6">
+        Bolão do Planinhas tá d+++ 🔥 — que vença o melhor (ou o mais sortudo)
+      </p>
 
       <div className="border-2 border-ink">
         <table className="w-full border-collapse">
@@ -1007,6 +1060,9 @@ function RankingTab({
               <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
                 Pts
               </th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-20">
+                Prêmio
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -1021,13 +1077,14 @@ function RankingTab({
                   ].join(" ")}
                 >
                   <td className="py-3 px-3 font-anton text-base">
-                    <span
-                      className={
-                        r.position <= 3 ? "text-green" : "text-mute"
-                      }
-                    >
-                      {r.position}º
-                    </span>
+                    {(() => {
+                      const maxPos = Math.max(...rankings.map((x) => x.position));
+                      if (r.position === 1) return <span title="Rei da bolada 👑" className="text-green">👑 1º</span>;
+                      if (r.position === 2) return <span className="text-green">2º</span>;
+                      if (r.position === 3) return <span className="text-green">3º</span>;
+                      if (r.position === maxPos) return <span title="Parabéns pela participação 🤡" className="text-amber-600">🤡 {r.position}º</span>;
+                      return <span className="text-mute">{r.position}º</span>;
+                    })()}
                   </td>
                   <td className="py-3 px-3">
                     <div className="flex items-center gap-2.5">
@@ -1118,6 +1175,18 @@ function RankingTab({
                   <td className="py-3 px-3 text-right font-anton text-lg text-ink">
                     {r.total_points}
                   </td>
+                  <td className="py-3 px-3 text-right font-mono text-xs whitespace-nowrap">
+                    {(() => {
+                      const amt = prizes.get(r.user_id) ?? 0;
+                      const maxPos = Math.max(...rankings.map((x) => x.position));
+                      const isLast = r.position === maxPos;
+                      return (
+                        <span className={amt > 0 ? (isLast ? "text-amber-600 font-bold" : "text-green font-bold") : "text-mute"}>
+                          {fmtPrize(amt)}
+                        </span>
+                      );
+                    })()}
+                  </td>
                 </tr>
               );
             })}
@@ -1126,9 +1195,12 @@ function RankingTab({
       </div>
 
       <p className="mt-4 font-serif italic text-xs text-soft">
-        Pontuação: <b className="text-green">+3</b> placar exato ·{" "}
-        <b className="text-green">+1</b> vencedor/empate ·{" "}
-        <b className="text-mute">0</b> errou.
+        <b className="text-green">+3</b> placar exato · <b className="text-green">+1</b> acertou o vencedor · <b className="text-mute">0</b> errou feio.
+        {" "}Empates no ranking dividem o prêmio — ninguém fica de fora.
+      </p>
+      <p className="mt-1 font-serif italic text-xs text-soft">
+        💰 <b className="text-green">1º fatura 70%</b> · 2º leva 20% · 3º fica com 10% — tudo calculado em cima do que entrou no caixão.
+        {" "}🤡 <b className="text-amber-600">Lanterna ganha R$50 de volta</b> — pelo menos não vai de graça.
       </p>
     </div>
   );
@@ -1138,7 +1210,7 @@ function RankingTab({
 // minuto oficial): 45' + 15 de intervalo + 2º tempo. O "~" avisa que é aproximado.
 function liveClock(kickoffIso: string, nowMs: number): string {
   const min = Math.floor((nowMs - new Date(kickoffIso).getTime()) / 60000);
-  if (min < 1) return "começando";
+  if (min < 1) return "apita o árbitro";
   if (min <= 47) return `~${Math.min(45, min)}' 1ºT`;
   if (min <= 62) return "intervalo";
   if (min <= 112) return `~${Math.min(90, min - 17)}' 2ºT`;
@@ -1215,10 +1287,16 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
                 </span>
               </div>
               <div className="flex flex-col items-center gap-1">
-                <div className="font-anton text-2xl text-ink">
-                  {m.home_score ?? 0} <span className="text-mute text-base mx-1">×</span>{" "}
-                  {m.away_score ?? 0}
-                </div>
+                {isLive && m.home_score === null ? (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-green font-bold text-center leading-tight">
+                    APITA O<br />ÁRBITRO
+                  </div>
+                ) : (
+                  <div className="font-anton text-2xl text-ink">
+                    {m.home_score ?? 0} <span className="text-mute text-base mx-1">×</span>{" "}
+                    {m.away_score ?? 0}
+                  </div>
+                )}
                 {isLive ? (
                   <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-green font-bold">
                     <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" />

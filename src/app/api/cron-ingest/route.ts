@@ -196,12 +196,23 @@ async function run(req: NextRequest) {
         url: "/apostas?tab=ranking",
       });
     } else if (scoreChanged) {
-      pushEvents.push({
-        title: "GOL! ⚽",
-        body: `${homeName} ${hs} × ${as} ${awayName}`,
-        tag: `gol-${am.id}`,
-        url: "/apostas?tab=resultados",
-      });
+      const isMatchStart = mine.home_score === null && mine.away_score === null;
+      const goalsIncreased = (ourHome + ourAway) > ((mine.home_score ?? 0) + (mine.away_score ?? 0));
+      if (isMatchStart) {
+        pushEvents.push({
+          title: "Apita o árbitro! ⚽",
+          body: `${homeName} × ${awayName} — jogo começando`,
+          tag: `gol-${am.id}`,
+          url: "/apostas?tab=resultados",
+        });
+      } else if (goalsIncreased) {
+        pushEvents.push({
+          title: "GOL! ⚽",
+          body: `${homeName} ${hs} × ${as} ${awayName}`,
+          tag: `gol-${am.id}`,
+          url: "/apostas?tab=resultados",
+        });
+      }
     }
   }
 

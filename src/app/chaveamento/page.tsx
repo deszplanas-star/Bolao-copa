@@ -138,7 +138,7 @@ export default async function ChaveamentoPage() {
         <div className="max-w-[1280px] mx-auto px-8 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2 font-anton uppercase tracking-wider text-base">
             <span className="w-2 h-2 bg-green rounded-full animate-pulse" />
-            Bolão / 26
+            Bolão do Planinhas
           </div>
           <Link
             href="/apostas"
