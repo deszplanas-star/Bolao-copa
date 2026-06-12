@@ -43,10 +43,10 @@ from public.users u
 inner join public.payments pay on pay.user_id = u.id and pay.status = 'approved'
 left join totals t on t.user_id = u.id;
 
--- Punição do Fabricio (atraso no envio da proposta)
+-- Punição do Fabricio (atraso no envio das apostas)
 update public.users
    set penalty_points = 2,
-       penalty_reason = 'Perdeu 2 pontos por atraso no envio da proposta'
+       penalty_reason = 'Perdeu 2 pontos por atraso no envio das apostas'
  where email = 'fabricio.rezende82003@gmail.com';
 
 notify pgrst, 'reload schema';

@@ -1012,10 +1012,11 @@ function RankingTab({
                         </span>
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink">
+                        {r.name ?? "Sem nome"}
                         {(r.penalty_points ?? 0) > 0 && (
                           <button
                             type="button"
-                            className="mr-1.5 cursor-help"
+                            className="ml-1.5 cursor-help"
                             title={
                               r.penalty_reason ??
                               `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
@@ -1032,7 +1033,6 @@ function RankingTab({
                             🔨
                           </button>
                         )}
-                        {r.name ?? "Sem nome"}
                         {isMe && (
                           <span className="ml-2 font-mono text-[9px] tracking-widest text-green">
                             VOCÊ
