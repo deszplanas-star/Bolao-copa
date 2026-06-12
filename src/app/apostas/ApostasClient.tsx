@@ -1079,7 +1079,7 @@ function RankingTab({
                   <td className="py-3 px-3 font-anton text-base">
                     {(() => {
                       const maxPos = Math.max(...rankings.map((x) => x.position));
-                      if (r.position === 1) return <span title="Rei da bolada 👑" className="text-green">👑 1º</span>;
+                      if (r.position === 1) return <span title="Rei do pitaco 👑" className="text-green">👑 1º</span>;
                       if (r.position === 2) return <span className="text-green">2º</span>;
                       if (r.position === 3) return <span className="text-green">3º</span>;
                       if (r.position === maxPos) return <span title="Parabéns pela participação 🤡" className="text-amber-600">🤡 {r.position}º</span>;
