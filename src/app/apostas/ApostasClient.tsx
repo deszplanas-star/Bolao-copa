@@ -1011,30 +1011,37 @@ function RankingTab({
                           {(r.name ?? "?").slice(0, 1).toUpperCase()}
                         </span>
                       )}
-                      <span className="font-anton uppercase tracking-tight text-sm text-ink">
-                        {r.name ?? "Sem nome"}
+                      <span className="font-anton uppercase tracking-tight text-sm text-ink flex items-center flex-wrap gap-x-1.5 min-w-0">
+                        <span>{r.name ?? "Sem nome"}</span>
                         {(r.penalty_points ?? 0) > 0 && (
                           <button
                             type="button"
-                            className="ml-1.5 cursor-help"
+                            className="cursor-help flex-shrink-0 grid place-items-center"
                             title={
                               r.penalty_reason ??
                               `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
                             }
                             onClick={() =>
                               onToast(
-                                `🔨 ${r.name ?? "Jogador"}: ${
+                                `${r.name ?? "Jogador"}: ${
                                   r.penalty_reason ??
                                   `-${r.penalty_points} ponto(s) por punição do admin`
                                 }`,
                               )
                             }
                           >
-                            🔨
+                            {/* martelo de juiz (gavel) — não existe como emoji */}
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="w-3.5 h-3.5 fill-red-700"
+                              aria-label="Punição do juiz"
+                            >
+                              <path d="M2 21v-2h12v2H2zm4.3-7.7L2.05 9.05l2.1-2.1 4.25 4.25-2.1 2.1zm6.4-6.4L8.45 2.65l2.1-2.1 4.25 4.25-2.1 2.1zm7.7 14.05L7.1 7.65l2.1-2.1 13.3 13.3-2.1 2.1z" />
+                            </svg>
                           </button>
                         )}
                         {isMe && (
-                          <span className="ml-2 font-mono text-[9px] tracking-widest text-green">
+                          <span className="font-mono text-[9px] tracking-widest text-green">
                             VOCÊ
                           </span>
                         )}
