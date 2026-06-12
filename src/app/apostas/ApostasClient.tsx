@@ -1033,7 +1033,7 @@ function RankingTab({
                             {/* martelo de juiz (gavel) — não existe como emoji */}
                             <svg
                               viewBox="0 0 24 24"
-                              className="w-3.5 h-3.5 fill-red-700"
+                              className="w-3.5 h-3.5 fill-amber-700"
                               aria-label="Punição do juiz"
                             >
                               <path d="M2 21v-2h12v2H2zm4.3-7.7L2.05 9.05l2.1-2.1 4.25 4.25-2.1 2.1zm6.4-6.4L8.45 2.65l2.1-2.1 4.25 4.25-2.1 2.1zm7.7 14.05L7.1 7.65l2.1-2.1 13.3 13.3-2.1 2.1z" />
