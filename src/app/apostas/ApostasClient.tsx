@@ -634,7 +634,7 @@ export default function ApostasClient({
         )}
 
         {tab === "ranking" && (
-          <RankingTab rankings={rankings} currentUserId={currentUserId} onToast={setToast} />
+          <RankingTab rankings={rankings} currentUserId={currentUserId} />
         )}
         {tab === "resultados" && <ResultadosTab matches={matches} />}
         {tab === "minhas" && <MinhasApostasTab matches={matches} />}
@@ -927,12 +927,18 @@ function EmptyTab({ title, text }: { title: React.ReactNode; text: string }) {
 function RankingTab({
   rankings,
   currentUserId,
-  onToast,
 }: {
   rankings: RankingRow[];
   currentUserId: string;
-  onToast: (msg: string) => void;
 }) {
+  // Tooltip da punição: abre ancorado ACIMA do martelinho e some em 4s
+  const [tipFor, setTipFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tipFor) return;
+    const t = setTimeout(() => setTipFor(null), 4000);
+    return () => clearTimeout(t);
+  }, [tipFor]);
+
   if (rankings.length === 0) {
     return (
       <EmptyTab
@@ -1014,31 +1020,35 @@ function RankingTab({
                       <span className="font-anton uppercase tracking-tight text-sm text-ink flex items-center flex-wrap gap-x-1.5 min-w-0">
                         <span>{r.name ?? "Sem nome"}</span>
                         {(r.penalty_points ?? 0) > 0 && (
-                          <button
-                            type="button"
-                            className="cursor-help flex-shrink-0 grid place-items-center"
-                            title={
-                              r.penalty_reason ??
-                              `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
-                            }
-                            onClick={() =>
-                              onToast(
-                                `${r.name ?? "Jogador"}: ${
-                                  r.penalty_reason ??
-                                  `-${r.penalty_points} ponto(s) por punição do admin`
-                                }`,
-                              )
-                            }
-                          >
-                            {/* martelo de juiz (gavel) — não existe como emoji */}
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="w-3.5 h-3.5 fill-amber-700"
-                              aria-label="Punição do juiz"
+                          <span className="relative inline-flex flex-shrink-0">
+                            <button
+                              type="button"
+                              className="cursor-help grid place-items-center"
+                              title={
+                                r.penalty_reason ??
+                                `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
+                              }
+                              onClick={() =>
+                                setTipFor(tipFor === r.user_id ? null : r.user_id)
+                              }
                             >
-                              <path d="M2 21v-2h12v2H2zm4.3-7.7L2.05 9.05l2.1-2.1 4.25 4.25-2.1 2.1zm6.4-6.4L8.45 2.65l2.1-2.1 4.25 4.25-2.1 2.1zm7.7 14.05L7.1 7.65l2.1-2.1 13.3 13.3-2.1 2.1z" />
-                            </svg>
-                          </button>
+                              {/* martelo de juiz (gavel) — não existe como emoji */}
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="w-3.5 h-3.5 fill-amber-700"
+                                aria-label="Punição do juiz"
+                              >
+                                <path d="M2 21v-2h12v2H2zm4.3-7.7L2.05 9.05l2.1-2.1 4.25 4.25-2.1 2.1zm6.4-6.4L8.45 2.65l2.1-2.1 4.25 4.25-2.1 2.1zm7.7 14.05L7.1 7.65l2.1-2.1 13.3 13.3-2.1 2.1z" />
+                              </svg>
+                            </button>
+                            {tipFor === r.user_id && (
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[230px] bg-ink text-paper font-serif normal-case tracking-normal text-[11px] leading-snug px-3 py-2 text-center z-30 shadow-lg">
+                                {r.penalty_reason ??
+                                  `-${r.penalty_points} ponto(s) por punição do admin`}
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-ink" />
+                              </span>
+                            )}
+                          </span>
                         )}
                         {isMe && (
                           <span className="font-mono text-[9px] tracking-widest text-green">
