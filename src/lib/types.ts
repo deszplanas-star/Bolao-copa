@@ -65,4 +65,7 @@ export type RankingRow = {
   // migration rodar, pra view antiga não quebrar o app.
   penalty_points?: number;
   penalty_reason?: string | null;
+  // Total de palpites do jogador (migration 0007) — quem entrou atrasado
+  // tem menos que o total de jogos e ganha o badge (i) no ranking.
+  bet_count?: number;
 };

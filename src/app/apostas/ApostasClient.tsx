@@ -643,7 +643,11 @@ export default function ApostasClient({
         )}
 
         {tab === "ranking" && (
-          <RankingTab rankings={rankings} currentUserId={currentUserId} />
+          <RankingTab
+            rankings={rankings}
+            currentUserId={currentUserId}
+            totalMatches={matches.length}
+          />
         )}
         {tab === "resultados" && <ResultadosTab matches={matches} />}
         {tab === "minhas" && <MinhasApostasTab matches={matches} />}
@@ -946,11 +950,13 @@ function EmptyTab({ title, text }: { title: React.ReactNode; text: string }) {
 function RankingTab({
   rankings,
   currentUserId,
+  totalMatches,
 }: {
   rankings: RankingRow[];
   currentUserId: string;
+  totalMatches: number;
 }) {
-  // Tooltip da punição: abre ancorado ACIMA do martelinho e some em 4s
+  // Tooltip dos badges (punição/entrada tardia): ancorado ACIMA, some em 4s
   const [tipFor, setTipFor] = useState<string | null>(null);
   useEffect(() => {
     if (!tipFor) return;
@@ -1048,7 +1054,9 @@ function RankingTab({
                                 `Punição: -${r.penalty_points} ponto(s) aplicado(s) pelo admin`
                               }
                               onClick={() =>
-                                setTipFor(tipFor === r.user_id ? null : r.user_id)
+                                setTipFor(
+                                  tipFor === `${r.user_id}:pen` ? null : `${r.user_id}:pen`,
+                                )
                               }
                             >
                               {/* martelo de juiz (gavel) — não existe como emoji */}
@@ -1060,10 +1068,34 @@ function RankingTab({
                                 <path d="M2 21v-2h12v2H2zm4.3-7.7L2.05 9.05l2.1-2.1 4.25 4.25-2.1 2.1zm6.4-6.4L8.45 2.65l2.1-2.1 4.25 4.25-2.1 2.1zm7.7 14.05L7.1 7.65l2.1-2.1 13.3 13.3-2.1 2.1z" />
                               </svg>
                             </button>
-                            {tipFor === r.user_id && (
+                            {tipFor === `${r.user_id}:pen` && (
                               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[230px] bg-ink text-paper font-serif normal-case tracking-normal text-[11px] leading-snug px-3 py-2 text-center z-30 shadow-lg">
                                 {r.penalty_reason ??
                                   `-${r.penalty_points} ponto(s) por punição do admin`}
+                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-ink" />
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {(r.bet_count ?? totalMatches) < totalMatches && (
+                          <span className="relative inline-flex flex-shrink-0">
+                            <button
+                              type="button"
+                              className="cursor-help w-4 h-4 rounded-full border border-soft text-soft grid place-items-center font-serif italic text-[10px] leading-none hover:border-ink hover:text-ink"
+                              title={`Entrou no bolão com a Copa em andamento — ${totalMatches - (r.bet_count ?? 0)} jogo(s) já realizados ficam fora da pontuação dele.`}
+                              onClick={() =>
+                                setTipFor(
+                                  tipFor === `${r.user_id}:late` ? null : `${r.user_id}:late`,
+                                )
+                              }
+                            >
+                              i
+                            </button>
+                            {tipFor === `${r.user_id}:late` && (
+                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[240px] bg-ink text-paper font-serif normal-case tracking-normal text-[11px] leading-snug px-3 py-2 text-center z-30 shadow-lg">
+                                Entrou no bolão com a Copa em andamento —{" "}
+                                {totalMatches - (r.bet_count ?? 0)} jogo(s) já realizados ficam
+                                fora da pontuação dele.
                                 <span className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-ink" />
                               </span>
                             )}
