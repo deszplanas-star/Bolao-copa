@@ -1052,10 +1052,10 @@ function RankingTab({
               <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">
                 Jogador
               </th>
-              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
+              <th className="hidden sm:table-cell text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
                 Exatos
               </th>
-              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
+              <th className="hidden sm:table-cell text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
                 Parciais
               </th>
               <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">
@@ -1166,10 +1166,10 @@ function RankingTab({
                       </span>
                     </div>
                   </td>
-                  <td className="py-3 px-3 text-right font-mono text-sm text-soft">
+                  <td className="hidden sm:table-cell py-3 px-3 text-right font-mono text-sm text-soft">
                     {r.exact_hits}
                   </td>
-                  <td className="py-3 px-3 text-right font-mono text-sm text-soft">
+                  <td className="hidden sm:table-cell py-3 px-3 text-right font-mono text-sm text-soft">
                     {r.partial_hits}
                   </td>
                   <td className="py-3 px-3 text-right font-anton text-lg text-ink">
