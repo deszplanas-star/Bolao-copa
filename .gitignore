@@ -49,3 +49,12 @@ next-env.d.ts
 # OS
 .DS_Store
 desktop.ini
+
+# dados/backups locais e artefatos de teste (nunca commitar — podem ter dados de apostadores)
+_an_*.json
+_wiki_fixtures.json
+backup_matches_*.json
+_estrategia.py
+bolao-estrategia.html
+*-teste.pdf
+consolidado-*.pdf

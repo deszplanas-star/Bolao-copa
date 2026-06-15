@@ -1304,9 +1304,9 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
               key={m.id}
               className={[
                 "border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3",
-                !isLive ? "cursor-pointer hover:border-ink transition-colors" : "",
+                "cursor-pointer hover:border-ink transition-colors",
               ].join(" ")}
-              onClick={!isLive ? () => setOpenMatchId(m.id) : undefined}
+              onClick={() => setOpenMatchId(m.id)}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <img
@@ -1385,18 +1385,29 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
           );
         })}
       </div>
-      <p className="mt-4 font-serif italic text-xs text-soft">Toque num jogo encerrado para ver quem cravou.</p>
+      <p className="mt-4 font-serif italic text-xs text-soft">Toque em qualquer jogo — ao vivo ou encerrado — para ver o palpite e a pontuação de todos.</p>
 
-      {/* Popup quem cravou */}
+      {/* Popup com o palpite e a pontuação de todos */}
       {openMatchId && (
         <div className="fixed inset-0 bg-ink/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setOpenMatchId(null)}>
           <div className="bg-paper w-full sm:max-w-sm max-h-[80vh] overflow-y-auto border-t-4 sm:border-4 border-ink" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-rule flex items-center justify-between sticky top-0 bg-paper z-10">
               <div>
-                <p className="font-anton uppercase text-base text-ink">Quem cravou</p>
+                <p className="font-anton uppercase text-base text-ink">
+                  {openMatch && openMatch.status !== "finished" ? "Palpites · ao vivo" : "Palpites do jogo"}
+                </p>
                 {openMatch && (
                   <p className="font-mono text-[10px] uppercase tracking-widest text-mute">
-                    {openMatch.home.name} {openMatch.home_score} × {openMatch.away_score} {openMatch.away.name}
+                    {openMatch.home.name}{" "}
+                    {openMatch.home_score !== null && openMatch.away_score !== null
+                      ? `${openMatch.home_score} × ${openMatch.away_score}`
+                      : "×"}{" "}
+                    {openMatch.away.name}
+                  </p>
+                )}
+                {openMatch && openMatch.status !== "finished" && (
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-green font-bold mt-0.5">
+                    ● pontuação parcial — o jogo ainda está rolando
                   </p>
                 )}
               </div>
@@ -1405,11 +1416,12 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
             <div className="divide-y divide-rule">
               {predLoading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
               {!predLoading && matchPreds && matchPreds.length === 0 && (
-                <div className="p-6 text-center font-mono text-xs text-mute">ninguém cravou esse jogo 😅</div>
+                <div className="p-6 text-center font-mono text-xs text-mute">ninguém palpitou nesse jogo 😅</div>
               )}
-              {!predLoading && matchPreds && matchPreds.map((p) => (
+              {!predLoading && matchPreds && matchPreds.map((p, i) => (
                 <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-anton text-xs text-mute w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
                     {p.avatar_url ? (
                       <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover flex-shrink-0" />
                     ) : (
