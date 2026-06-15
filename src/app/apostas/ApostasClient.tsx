@@ -1232,22 +1232,92 @@ function liveClock(kickoffIso: string, nowMs: number): string {
 
 type MatchPred = { userId: string; name: string; avatar_url: string | null; home_score: number; away_score: number; points: number; computed: boolean };
 
+/**
+ * Popup com o palpite e a pontuação de TODOS os apostadores de um jogo.
+ * Reaproveitado nas abas Resultados e Minhas apostas. Busca os palpites
+ * sozinho a partir do match.id. Para jogos que ainda não começaram (sem
+ * placar) mostra "-" na pontuação, em vez de "0".
+ */
+function MatchPredictionsModal({ match, onClose }: { match: MatchView | null; onClose: () => void }) {
+  const [preds, setPreds] = useState<MatchPred[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!match) { setPreds(null); return; }
+    setLoading(true);
+    fetch(`/api/match-predictions/${match.id}`)
+      .then((r) => r.json())
+      .then((d) => { setPreds(d.predictions ?? []); setLoading(false); })
+      .catch(() => { setPreds([]); setLoading(false); });
+  }, [match]);
+
+  if (!match) return null;
+
+  const hasScore = match.home_score !== null && match.away_score !== null;
+  const notStarted = !hasScore;
+  const live = match.status !== "finished";
+
+  return (
+    <div className="fixed inset-0 bg-ink/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-paper w-full sm:max-w-sm max-h-[80vh] overflow-y-auto border-t-4 sm:border-4 border-ink" onClick={(e) => e.stopPropagation()}>
+        <div className="px-4 py-3 border-b border-rule flex items-center justify-between sticky top-0 bg-paper z-10">
+          <div>
+            <p className="font-anton uppercase text-base text-ink">
+              {notStarted ? "Palpites · não começou" : live ? "Palpites · ao vivo" : "Palpites do jogo"}
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-mute">
+              {match.home.name} {hasScore ? `${match.home_score} × ${match.away_score}` : "×"} {match.away.name}
+            </p>
+            {live && !notStarted && (
+              <p className="font-mono text-[9px] uppercase tracking-widest text-green font-bold mt-0.5">
+                ● pontuação parcial — o jogo ainda está rolando
+              </p>
+            )}
+          </div>
+          <button type="button" className="font-anton text-xl text-mute hover:text-ink leading-none" onClick={onClose}>×</button>
+        </div>
+        <div className="divide-y divide-rule">
+          {loading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
+          {!loading && preds && preds.length === 0 && (
+            <div className="p-6 text-center font-mono text-xs text-mute">ninguém palpitou nesse jogo 😅</div>
+          )}
+          {!loading && preds && preds.map((p, i) => (
+            <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-anton text-xs text-mute w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
+                {p.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover flex-shrink-0" />
+                ) : (
+                  <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute flex-shrink-0">
+                    {(p.name ?? "?").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="font-anton uppercase tracking-tight text-sm truncate">{p.name ?? "?"}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="font-mono text-sm whitespace-nowrap">{p.home_score} × {p.away_score}</span>
+                <span className={[
+                  "font-anton text-[10px] px-1.5 py-0.5 whitespace-nowrap",
+                  notStarted ? "bg-paper2 text-mute"
+                    : p.points === 3 ? "bg-green text-paper"
+                      : p.points === 1 ? "bg-yellow text-ink"
+                        : "bg-paper2 text-mute",
+                ].join(" ")}>
+                  {notStarted ? "–" : p.points === 3 ? "🎯 +3" : p.points === 1 ? "+1" : "0"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ResultadosTab({ matches }: { matches: MatchView[] }) {
   const nowMs = Date.now();
   const [openMatchId, setOpenMatchId] = useState<string | null>(null);
-  const [matchPreds, setMatchPreds] = useState<MatchPred[] | null>(null);
-  const [predLoading, setPredLoading] = useState(false);
-
-  useEffect(() => {
-    if (!openMatchId) { setMatchPreds(null); return; }
-    setPredLoading(true);
-    fetch(`/api/match-predictions/${openMatchId}`)
-      .then((r) => r.json())
-      .then((d) => { setMatchPreds(d.predictions ?? []); setPredLoading(false); })
-      .catch(() => { setMatchPreds([]); setPredLoading(false); });
-  }, [openMatchId]);
-
-  const openMatch = openMatchId ? matches.find((m) => m.id === openMatchId) : null;
+  const openMatch = openMatchId ? matches.find((m) => m.id === openMatchId) ?? null : null;
 
   const live = matches.filter((m) => {
     if (m.status === "finished") return false;
@@ -1387,70 +1457,14 @@ function ResultadosTab({ matches }: { matches: MatchView[] }) {
       </div>
       <p className="mt-4 font-serif italic text-xs text-soft">Toque em qualquer jogo — ao vivo ou encerrado — para ver o palpite e a pontuação de todos.</p>
 
-      {/* Popup com o palpite e a pontuação de todos */}
-      {openMatchId && (
-        <div className="fixed inset-0 bg-ink/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setOpenMatchId(null)}>
-          <div className="bg-paper w-full sm:max-w-sm max-h-[80vh] overflow-y-auto border-t-4 sm:border-4 border-ink" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 border-b border-rule flex items-center justify-between sticky top-0 bg-paper z-10">
-              <div>
-                <p className="font-anton uppercase text-base text-ink">
-                  {openMatch && openMatch.status !== "finished" ? "Palpites · ao vivo" : "Palpites do jogo"}
-                </p>
-                {openMatch && (
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-mute">
-                    {openMatch.home.name}{" "}
-                    {openMatch.home_score !== null && openMatch.away_score !== null
-                      ? `${openMatch.home_score} × ${openMatch.away_score}`
-                      : "×"}{" "}
-                    {openMatch.away.name}
-                  </p>
-                )}
-                {openMatch && openMatch.status !== "finished" && (
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-green font-bold mt-0.5">
-                    ● pontuação parcial — o jogo ainda está rolando
-                  </p>
-                )}
-              </div>
-              <button type="button" className="font-anton text-xl text-mute hover:text-ink leading-none" onClick={() => setOpenMatchId(null)}>×</button>
-            </div>
-            <div className="divide-y divide-rule">
-              {predLoading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
-              {!predLoading && matchPreds && matchPreds.length === 0 && (
-                <div className="p-6 text-center font-mono text-xs text-mute">ninguém palpitou nesse jogo 😅</div>
-              )}
-              {!predLoading && matchPreds && matchPreds.map((p, i) => (
-                <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-anton text-xs text-mute w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
-                    {p.avatar_url ? (
-                      <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover flex-shrink-0" />
-                    ) : (
-                      <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute flex-shrink-0">
-                        {(p.name ?? "?").slice(0, 1).toUpperCase()}
-                      </span>
-                    )}
-                    <span className="font-anton uppercase tracking-tight text-sm truncate">{p.name ?? "?"}</span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="font-mono text-sm whitespace-nowrap">{p.home_score} × {p.away_score}</span>
-                    <span className={[
-                      "font-anton text-[10px] px-1.5 py-0.5 whitespace-nowrap",
-                      p.points === 3 ? "bg-green text-paper" : p.points === 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
-                    ].join(" ")}>
-                      {p.points === 3 ? "🎯 +3" : p.points === 1 ? "+1" : "0"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <MatchPredictionsModal match={openMatch} onClose={() => setOpenMatchId(null)} />
     </div>
   );
 }
 
 function MinhasApostasTab({ matches }: { matches: MatchView[] }) {
+  const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  const openMatch = openMatchId ? matches.find((m) => m.id === openMatchId) ?? null : null;
   const withPrediction = matches.filter((m) => m.prediction !== null);
   const totalPoints = withPrediction.reduce(
     (s, m) => s + (m.prediction?.points ?? 0),
@@ -1498,7 +1512,8 @@ function MinhasApostasTab({ matches }: { matches: MatchView[] }) {
           return (
             <div
               key={m.id}
-              className="border border-rule bg-paper p-3 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3"
+              className="border border-rule bg-paper p-3 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3 cursor-pointer hover:border-ink transition-colors"
+              onClick={() => setOpenMatchId(m.id)}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <img
@@ -1548,6 +1563,9 @@ function MinhasApostasTab({ matches }: { matches: MatchView[] }) {
           );
         })}
       </div>
+      <p className="mt-4 font-serif italic text-xs text-soft">Toque em qualquer jogo para ver o palpite e a pontuação de todos.</p>
+
+      <MatchPredictionsModal match={openMatch} onClose={() => setOpenMatchId(null)} />
     </div>
   );
 }
