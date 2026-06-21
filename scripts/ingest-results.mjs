@@ -32,6 +32,9 @@ if (!FD_TOKEN || !SB_URL || !SB_KEY) {
 
 // Sigla (TLA) da football-data.org → iso_code do nosso banco.
 const TLA_TO_ISO = {
+  // A football-data OSCILA o TLA de Uruguai (URU/URY) e Curaçao (CUR/CUW)
+  // entre código FIFA e ISO. Mapeamos as duas variantes pra não perder placar.
+  URU: "uy", CUR: "cw",
   MEX: "mx", CZE: "cz", KOR: "kr", RSA: "za",
   SUI: "ch", CAN: "ca", BIH: "ba", QAT: "qa",
   BRA: "br", MAR: "ma", SCO: "gb-sct", HAI: "ht",
@@ -56,6 +59,7 @@ const APP_URL = process.env.APP_URL || "https://bolao-copa-pu3k.vercel.app";
 
 // Nome em pt-BR pra notificação e pro chaveamento (TLA da football-data).
 const TLA_TO_NAME = {
+  URU: "Uruguai", CUR: "Curaçau",
   MEX: "México", CZE: "Rep. Tcheca", KOR: "Coreia do Sul", RSA: "África do Sul",
   SUI: "Suíça", CAN: "Canadá", BIH: "Bósnia", QAT: "Catar",
   BRA: "Brasil", MAR: "Marrocos", SCO: "Escócia", HAI: "Haiti",

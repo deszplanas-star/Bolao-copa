@@ -102,10 +102,10 @@ export default function ApostasClient({
   const router = useRouter();
 
   // Placar/ranking ao vivo: nas abas Resultados e Ranking, recarrega os
-  // dados do servidor a cada 60s (mesmo ritmo do ingest), sem refresh manual.
+  // dados do servidor a cada 30s, sem refresh manual.
   useEffect(() => {
     if (tab !== "resultados" && tab !== "ranking") return;
-    const id = setInterval(() => router.refresh(), 60_000);
+    const id = setInterval(() => router.refresh(), 30_000);
     return () => clearInterval(id);
   }, [tab, router]);
   const [showPixModal, setShowPixModal] = useState(false);

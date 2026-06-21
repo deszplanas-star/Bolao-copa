@@ -14,6 +14,10 @@ export const maxDuration = 60;
 // ============================================================
 
 const TLA_TO_ISO: Record<string, string> = {
+  // A football-data OSCILA o TLA de alguns times entre o código FIFA e o ISO
+  // de chamada pra chamada. Mapeamos AMBAS as variantes pra não perder placar
+  // ao vivo: Uruguai (URU/URY) e Curaçao (CUR/CUW).
+  URU: "uy", CUR: "cw",
   MEX: "mx", CZE: "cz", KOR: "kr", RSA: "za",
   SUI: "ch", CAN: "ca", BIH: "ba", QAT: "qa",
   BRA: "br", MAR: "ma", SCO: "gb-sct", HAI: "ht",
@@ -28,6 +32,7 @@ const TLA_TO_ISO: Record<string, string> = {
   ENG: "gb-eng", CRO: "hr", GHA: "gh", PAN: "pa",
 };
 const TLA_TO_NAME: Record<string, string> = {
+  URU: "Uruguai", CUR: "Curaçau",
   MEX: "México", CZE: "Rep. Tcheca", KOR: "Coreia do Sul", RSA: "África do Sul",
   SUI: "Suíça", CAN: "Canadá", BIH: "Bósnia", QAT: "Catar",
   BRA: "Brasil", MAR: "Marrocos", SCO: "Escócia", HAI: "Haiti",
