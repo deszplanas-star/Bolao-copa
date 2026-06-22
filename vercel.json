@@ -1,8 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron-ingest",
-      "schedule": "* * * * *"
-    }
-  ]
+  "$comment": "Cron de 1 min removido: conta Hobby so permite cron diario, e o que existe quebrava TODOS os deploys (build deploy_failed). O ingest de 1 em 1 min e feito pelo n8n (workflow FIDN2zk1Dw6ouiME) chamando /api/cron-ingest com CRON_SECRET. Se um dia migrar pro Pro, da pra reintroduzir crons aqui."
 }
