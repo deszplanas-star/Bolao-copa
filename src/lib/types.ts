@@ -69,3 +69,66 @@ export type RankingRow = {
   // tem menos que o total de jogos e ganha o badge (i) no ranking.
   bet_count?: number;
 };
+
+// ============================================================
+// FASE 2 — MATA-MATA (migration 0008)
+// ============================================================
+
+// Espelho da football-data (tabela ko_matches, alimentada pelo cron-ingest).
+export type KoMatch = {
+  id: string;
+  fd_id: number;
+  stage: string; // LAST_32 | LAST_16 | QUARTER_FINALS | SEMI_FINALS | THIRD_PLACE | FINAL
+  home_name: string | null;
+  away_name: string | null;
+  home_iso: string | null;
+  away_iso: string | null;
+  kickoff_at: string | null;
+  home_score: number | null;
+  away_score: number | null;
+  pen_home: number | null;
+  pen_away: number | null;
+  status: string; // scheduled | live | finished
+};
+
+// Palpite do usuário num jogo do mata-mata: 4 placares (normal + pênaltis).
+export type KoPredictionFields = {
+  home_score: number;
+  away_score: number;
+  pen_home: number;
+  pen_away: number;
+  normal_points: number;
+  pen_points: number;
+  points: number;
+  computed_at: string | null;
+};
+
+export type KoMatchView = KoMatch & {
+  prediction: KoPredictionFields | null;
+};
+
+// Palpite de campeão do usuário (+5 se acertar).
+export type ChampionPick = {
+  team_iso: string;
+  team_name: string;
+  points: number;
+  computed_at: string | null;
+} | null;
+
+// Candidato ao palpite de campeão (seleção que aparece no chaveamento).
+export type ChampionCandidate = { iso: string; name: string };
+
+// Linha da view ko_rankings (gated por ko_payments aprovado).
+export type KoRankingRow = {
+  user_id: string;
+  name: string | null;
+  avatar_url: string | null;
+  total_points: number;
+  exact_hits: number;
+  pen_exact_hits: number;
+  resolved_count: number;
+  bet_count: number;
+  champion_points: number;
+  champion_pick: string | null;
+  position: number;
+};

@@ -383,6 +383,12 @@ export default function ApostasClient({
           >
             Chaveamento
           </a>
+          <a
+            href="/copa"
+            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-yellow border-transparent hover:border-yellow transition-colors"
+          >
+            🏆 Mata-mata
+          </a>
           <div className="flex-1" />
           {tab === "apostas" && (
             <div className="flex gap-0.5 items-center pr-4">

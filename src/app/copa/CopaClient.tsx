@@ -1,0 +1,824 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type {
+  ChampionCandidate,
+  ChampionPick,
+  KoMatchView,
+  KoRankingRow,
+} from "@/lib/types";
+import { upsertChampion, upsertKoPrediction } from "./actions";
+import { submitKoPayment } from "./payment-actions";
+
+// Trava de tempo da fase 2: 1h antes do apito (no cliente, só pra UI; o
+// servidor revalida).
+const KO_CUTOFF_MS = 60 * 60 * 1000;
+
+const STAGES: { key: string; label: string }[] = [
+  { key: "LAST_32", label: "16 avos de final" },
+  { key: "LAST_16", label: "Oitavas de final" },
+  { key: "QUARTER_FINALS", label: "Quartas de final" },
+  { key: "SEMI_FINALS", label: "Semifinais" },
+  { key: "THIRD_PLACE", label: "Disputa de 3º lugar" },
+  { key: "FINAL", label: "Final" },
+];
+
+const TABS = [
+  { key: "apostas", label: "Apostas" },
+  { key: "ranking", label: "Ranking" },
+] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+const flagUrl = (iso: string, w = 80) => `https://flagcdn.com/w${w}/${iso}.png`;
+
+function parseScore(v: string): number | null {
+  if (v === "") return null;
+  const n = parseInt(v, 10);
+  if (Number.isNaN(n) || n < 0 || n > 99) return null;
+  return n;
+}
+
+function fmtKickoff(iso: string | null) {
+  if (!iso) return "a definir";
+  return new Date(iso).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type Draft = {
+  h: string;
+  a: string;
+  ph: string;
+  pa: string;
+  saving?: boolean;
+  error?: string | null;
+};
+type DraftMap = Record<string, Draft>;
+
+type Props = {
+  user: { email: string; name: string };
+  currentUserId: string;
+  matches: KoMatchView[];
+  paymentStatus: "pending" | "approved" | "denied" | null;
+  rankings: KoRankingRow[];
+  champion: ChampionPick;
+  championLockAt: string | null;
+  candidates: ChampionCandidate[];
+  isAdmin: boolean;
+};
+
+export default function CopaClient({
+  user,
+  currentUserId,
+  matches,
+  paymentStatus,
+  rankings,
+  champion,
+  championLockAt,
+  candidates,
+  isAdmin,
+}: Props) {
+  const router = useRouter();
+  const [tab, setTab] = useState<TabKey>("apostas");
+  const [now, setNow] = useState(() => Date.now());
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [drafts, setDrafts] = useState<DraftMap>(() => {
+    const init: DraftMap = {};
+    for (const m of matches) {
+      if (m.prediction) {
+        init[m.id] = {
+          h: String(m.prediction.home_score),
+          a: String(m.prediction.away_score),
+          ph: String(m.prediction.pen_home),
+          pa: String(m.prediction.pen_away),
+        };
+      }
+    }
+    return init;
+  });
+
+  // Tick por minuto pra reavaliar travas/contagens.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Ranking ao vivo: recarrega do servidor a cada 30s na aba ranking.
+  useEffect(() => {
+    if (tab !== "ranking") return;
+    const id = setInterval(() => router.refresh(), 30_000);
+    return () => clearInterval(id);
+  }, [tab, router]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 2400);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // ===== Persistência (debounce por jogo) =====
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => {
+    const t = timers.current;
+    return () => Object.values(t).forEach((id) => clearTimeout(id));
+  }, []);
+
+  const persist = useCallback((matchId: string, d: Draft) => {
+    if (timers.current[matchId]) clearTimeout(timers.current[matchId]);
+    timers.current[matchId] = setTimeout(async () => {
+      const h = parseScore(d.h);
+      const a = parseScore(d.a);
+      const ph = parseScore(d.ph);
+      const pa = parseScore(d.pa);
+      // Só salva quando os 4 placares estão preenchidos (pênalti é obrigatório).
+      if (h === null || a === null || ph === null || pa === null) return;
+
+      setDrafts((prev) => ({ ...prev, [matchId]: { ...prev[matchId], saving: true, error: null } }));
+      try {
+        const res = await upsertKoPrediction({
+          ko_match_id: matchId,
+          home_score: h,
+          away_score: a,
+          pen_home: ph,
+          pen_away: pa,
+        });
+        if (!res.ok) throw new Error(res.error);
+        setDrafts((prev) => ({ ...prev, [matchId]: { ...prev[matchId], saving: false, error: null } }));
+        setToast("Palpite salvo");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao salvar";
+        setDrafts((prev) => ({ ...prev, [matchId]: { ...prev[matchId], saving: false, error: msg } }));
+        setToast(msg);
+      }
+    }, 600);
+  }, []);
+
+  function updateField(matchId: string, field: "h" | "a" | "ph" | "pa", raw: string) {
+    const cleaned = raw.replace(/\D/g, "").slice(0, 2);
+    const cur = drafts[matchId] ?? { h: "", a: "", ph: "", pa: "" };
+    const next = { ...cur, [field]: cleaned };
+    setDrafts((prev) => ({ ...prev, [matchId]: { ...(prev[matchId] ?? cur), [field]: cleaned } }));
+    persist(matchId, next);
+  }
+
+  // ===== Campeão =====
+  const championLocked = !!championLockAt && now >= new Date(championLockAt).getTime();
+  const [champSaving, setChampSaving] = useState(false);
+  const [champIso, setChampIso] = useState(champion?.team_iso ?? "");
+
+  async function pickChampion(iso: string) {
+    const cand = candidates.find((c) => c.iso === iso);
+    if (!cand) return;
+    setChampIso(iso);
+    setChampSaving(true);
+    const res = await upsertChampion({ team_iso: cand.iso, team_name: cand.name });
+    setChampSaving(false);
+    setToast(res.ok ? `Campeão: ${cand.name}` : res.error);
+    if (res.ok) router.refresh();
+  }
+
+  // ===== Contagens / agrupamento =====
+  const byStage = useMemo(() => {
+    const m = new Map<string, KoMatchView[]>();
+    for (const mt of matches) {
+      const arr = m.get(mt.stage) ?? [];
+      arr.push(mt);
+      m.set(mt.stage, arr);
+    }
+    return m;
+  }, [matches]);
+
+  function isOpen(m: KoMatchView) {
+    if (!m.home_name || !m.away_name) return false; // confronto não definido
+    if (!m.kickoff_at) return true;
+    if (m.status !== "scheduled") return false;
+    return new Date(m.kickoff_at).getTime() - now > KO_CUTOFF_MS;
+  }
+  function isFilled(m: KoMatchView) {
+    const d = drafts[m.id];
+    if (!d || d.error) return false;
+    return (
+      parseScore(d.h) !== null &&
+      parseScore(d.a) !== null &&
+      parseScore(d.ph) !== null &&
+      parseScore(d.pa) !== null
+    );
+  }
+
+  const openMatches = matches.filter(isOpen);
+  const openFilled = openMatches.filter(isFilled).length;
+
+  // ===== PIX =====
+  const [showPix, setShowPix] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [submittingPix, setSubmittingPix] = useState(false);
+  const [pixError, setPixError] = useState<string | null>(null);
+  const sealed = paymentStatus === "pending" || paymentStatus === "approved";
+
+  const noKo = matches.length === 0;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-paper">
+      {/* TOP BAR */}
+      <header className="bg-ink text-paper border-b-4 border-yellow flex-shrink-0">
+        <div className="max-w-[1280px] mx-auto px-8 h-14 grid grid-cols-[auto_1fr_auto] items-center gap-6">
+          <div className="flex items-center gap-2 font-anton uppercase tracking-wider text-base">
+            <span className="w-2 h-2 bg-yellow rounded-full animate-pulse" />
+            Mata-mata · Copa 26
+          </div>
+          <div className="hidden md:block text-center font-mono text-[11px] uppercase tracking-widest text-paper/70">
+            bolaocopa26.com <span className="opacity-40 mx-1.5">/</span>
+            <span className="text-yellow">mata-mata</span>
+          </div>
+          <div className="flex items-center gap-3 justify-end">
+            {isAdmin && (
+              <Link
+                href="/admin/mata-mata"
+                className="font-mono text-[10px] uppercase tracking-widest text-yellow hover:underline"
+              >
+                admin
+              </Link>
+            )}
+            <span className="hidden sm:block font-mono text-[11px] uppercase tracking-widest text-yellow">
+              {user.name}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {/* TABS */}
+      <nav className="bg-paper border-b border-rule sticky top-0 z-20 overflow-x-auto flex-shrink-0">
+        <div className="max-w-[1280px] mx-auto px-8 flex">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={[
+                "px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px flex items-center gap-2 transition-colors",
+                tab === t.key ? "text-yellow border-yellow" : "text-soft border-transparent hover:text-ink",
+              ].join(" ")}
+            >
+              {t.label}
+              {t.key === "apostas" && openMatches.length > 0 && (
+                <span
+                  className={[
+                    "font-mono text-[9px] px-[7px] py-[2px] tracking-wider",
+                    tab === "apostas" ? "bg-yellow text-ink" : "bg-paper3 text-ink",
+                  ].join(" ")}
+                >
+                  {openFilled}/{openMatches.length}
+                </span>
+              )}
+            </button>
+          ))}
+          <a
+            href="/apostas"
+            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
+          >
+            Fase de grupos
+          </a>
+          <a
+            href="/chaveamento"
+            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
+          >
+            Chaveamento
+          </a>
+        </div>
+      </nav>
+
+      <main className="flex-1 pb-32">
+        {tab === "apostas" && (
+          <div className="max-w-[1080px] mx-auto px-8 py-8">
+            {/* STATUS DA ENTRADA */}
+            {sealed && (
+              <div
+                className={[
+                  "border-l-4 px-5 py-4 mb-6 flex items-center gap-3",
+                  paymentStatus === "approved" ? "border-green bg-green/10" : "border-yellow bg-yellow/10",
+                ].join(" ")}
+              >
+                <span className="font-anton text-2xl">{paymentStatus === "approved" ? "✓" : "⏳"}</span>
+                <div>
+                  <div className="font-anton uppercase tracking-wider text-sm text-ink">
+                    {paymentStatus === "approved" ? "Entrada confirmada" : "Pix enviado · aguardando aprovação"}
+                  </div>
+                  <div className="font-serif italic text-xs text-soft mt-0.5">
+                    {paymentStatus === "approved"
+                      ? "Você está no ranking do mata-mata. Palpite cada rodada e o campeão."
+                      : "Pode palpitar normalmente — você entra no ranking assim que o admin aprovar."}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PALPITE DE CAMPEÃO */}
+            <section className="border-2 border-ink mb-8">
+              <div className="flex items-center justify-between px-5 py-3 border-b-2 border-ink bg-ink text-paper">
+                <h2 className="font-anton text-lg uppercase tracking-wider">🏆 Campeão · +5 pts</h2>
+                <span className="font-mono text-[10px] uppercase tracking-widest text-yellow">
+                  {championLocked ? "fechado" : championLockAt ? `fecha ${fmtKickoff(championLockAt)}` : "prazo a definir"}
+                </span>
+              </div>
+              <div className="p-5">
+                {candidates.length === 0 ? (
+                  <p className="font-serif italic text-sm text-soft">
+                    Os classificados aparecem aqui quando a fase de grupos terminar. Volte pra
+                    cravar o campeão antes do 1º jogo dos 16avos.
+                  </p>
+                ) : championLocked ? (
+                  <p className="font-anton uppercase tracking-wide text-ink">
+                    Seu campeão:{" "}
+                    <span className="text-green">{champion?.team_name ?? "não escolhido"}</span>
+                    {champion?.computed_at != null && (
+                      <span className="ml-2 font-mono text-xs text-mute">
+                        ({champion.points > 0 ? "✓ +5 acertou!" : "não foi dessa vez"})
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <>
+                    <p className="font-serif italic text-xs text-soft mb-3">
+                      Escolha quem você acha que levanta a taça. Dá pra trocar até o mata-mata começar.
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {candidates.map((c) => {
+                        const active = champIso === c.iso;
+                        return (
+                          <button
+                            key={c.iso}
+                            disabled={champSaving}
+                            onClick={() => pickChampion(c.iso)}
+                            className={[
+                              "flex items-center gap-2 px-3 py-2 border-2 font-anton text-sm uppercase tracking-wide transition-colors disabled:opacity-50",
+                              active
+                                ? "border-green bg-green/10 text-green"
+                                : "border-rule bg-paper text-ink hover:border-ink",
+                            ].join(" ")}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={flagUrl(c.iso, 40)} alt="" className="w-5 h-auto border border-rule" />
+                            <span className="truncate">{c.name}</span>
+                            {active && <span className="ml-auto">✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* JOGOS POR FASE */}
+            {noKo && (
+              <div className="border-2 border-dashed border-rule p-8 text-center font-serif italic text-soft">
+                Os confrontos do mata-mata aparecem aqui assim que a FIFA definir os classificados
+                (fim da fase de grupos). Atualiza sozinho.
+              </div>
+            )}
+
+            <div className="space-y-10">
+              {STAGES.map(({ key, label }) => {
+                const list = byStage.get(key) ?? [];
+                if (list.length === 0) return null;
+                return (
+                  <section key={key}>
+                    <h3 className="font-anton text-xl uppercase tracking-tight text-yellow mb-3">{label}</h3>
+                    <div className="space-y-3">
+                      {list.map((m) => (
+                        <KoMatchRow
+                          key={m.id}
+                          match={m}
+                          draft={drafts[m.id]}
+                          now={now}
+                          onChange={updateField}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === "ranking" && <KoRankingTab rankings={rankings} currentUserId={currentUserId} />}
+      </main>
+
+      {/* FOOTER CTA */}
+      {!sealed && (
+        <footer className="fixed bottom-0 left-0 right-0 bg-ink text-paper border-t-4 border-yellow z-30">
+          <div className="max-w-[1080px] mx-auto px-8 py-3 flex items-center gap-4">
+            <div className="flex-1 font-mono text-[11px] uppercase tracking-widest text-paper/80">
+              Entre no mata-mata · aposta independente da fase de grupos
+            </div>
+            <button
+              onClick={() => setShowPix(true)}
+              className="px-4 py-2.5 bg-yellow text-ink font-anton text-[13px] uppercase tracking-wider border-2 border-yellow hover:bg-yellow/90"
+            >
+              Entrar · R$ 50
+            </button>
+          </div>
+        </footer>
+      )}
+
+      {showPix && (
+        <KoPixModal
+          receiptFile={receiptFile}
+          setReceiptFile={setReceiptFile}
+          submitting={submittingPix}
+          error={pixError}
+          onClose={() => {
+            if (submittingPix) return;
+            setShowPix(false);
+            setPixError(null);
+          }}
+          onCopy={() => setToast("Chave Pix copiada")}
+          onConfirm={async () => {
+            if (!receiptFile) return;
+            setSubmittingPix(true);
+            setPixError(null);
+            try {
+              const fd = new FormData();
+              fd.append("receipt", receiptFile);
+              const res = await submitKoPayment(fd);
+              if (res.ok) {
+                setShowPix(false);
+                setReceiptFile(null);
+                setToast("Pagamento enviado · aguardando aprovação");
+                router.refresh();
+              } else {
+                setPixError(res.error);
+              }
+            } catch (e) {
+              console.error("[ko-pix] submit falhou", e);
+              setPixError(
+                "O envio falhou no caminho — pode ser o tamanho do comprovante ou a conexão. Tente um arquivo menor (print resolve) ou tente de novo.",
+              );
+            } finally {
+              setSubmittingPix(false);
+            }
+          }}
+        />
+      )}
+
+      {toast && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 bg-ink text-paper border-l-4 border-yellow px-5 py-3 font-anton text-[13px] uppercase tracking-wider z-40"
+          style={{ boxShadow: "4px 4px 0 #FFDF00" }}
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KoMatchRow({
+  match,
+  draft,
+  now,
+  onChange,
+}: {
+  match: KoMatchView;
+  draft: Draft | undefined;
+  now: number;
+  onChange: (matchId: string, field: "h" | "a" | "ph" | "pa", val: string) => void;
+}) {
+  const undefinedMatch = !match.home_name || !match.away_name;
+  const played = match.home_score !== null && match.away_score !== null;
+  const hadPens = match.pen_home !== null && match.pen_away !== null;
+
+  const timeLocked =
+    !undefinedMatch &&
+    !!match.kickoff_at &&
+    (match.status !== "scheduled" || new Date(match.kickoff_at).getTime() - now <= KO_CUTOFF_MS);
+  const locked = undefinedMatch || timeLocked;
+
+  const h = draft?.h ?? "";
+  const a = draft?.a ?? "";
+  const ph = draft?.ph ?? "";
+  const pa = draft?.pa ?? "";
+  const complete =
+    parseScore(h) !== null && parseScore(a) !== null && parseScore(ph) !== null && parseScore(pa) !== null;
+
+  const pts = match.prediction?.computed_at != null ? match.prediction.points : null;
+
+  const status = undefinedMatch ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-mute">confronto a definir</span>
+  ) : pts != null ? (
+    <span
+      className={[
+        "font-anton text-[11px] px-2 py-0.5 uppercase tracking-wider",
+        pts >= 3 ? "bg-green text-paper" : pts >= 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
+      ].join(" ")}
+    >
+      +{pts} pt{pts !== 1 ? "s" : ""}
+    </span>
+  ) : timeLocked ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-red-600">apostas fechadas</span>
+  ) : draft?.saving ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-mute">salvando…</span>
+  ) : draft?.error ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-red-600">{draft.error}</span>
+  ) : complete ? (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-green">palpite salvo</span>
+  ) : (
+    <span className="font-mono text-[10px] uppercase tracking-widest text-yellow-600">
+      preencha os 4 placares
+    </span>
+  );
+
+  const inputCls = (filled: boolean) =>
+    [
+      "w-11 h-11 text-center font-anton text-xl border-2 outline-none transition-colors",
+      filled ? "border-green text-ink bg-paper" : "border-rule text-mute bg-paper",
+      "focus:border-ink focus:bg-yellow/20",
+      locked ? "opacity-60 cursor-not-allowed" : "",
+    ].join(" ");
+
+  const homeName = match.home_name ?? "A definir";
+  const awayName = match.away_name ?? "A definir";
+
+  return (
+    <div className="border border-rule bg-paper p-4 hover:border-ink transition-colors">
+      <div className="flex items-center justify-between mb-3 font-mono text-[10px] uppercase tracking-widest text-mute">
+        <span>{fmtKickoff(match.kickoff_at)}{match.status === "live" ? " · ● AO VIVO" : ""}</span>
+        {status}
+      </div>
+
+      {/* Linha do placar do jogo (normal + prorrogação) */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {match.home_iso && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={flagUrl(match.home_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+          )}
+          <span className="font-anton uppercase tracking-tight text-base truncate">{homeName}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={played ? String(match.home_score) : h}
+            disabled={locked}
+            placeholder="–"
+            onChange={(e) => onChange(match.id, "h", e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            className={inputCls(parseScore(h) !== null)}
+          />
+          <span className="font-anton text-xl text-mute">×</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={played ? String(match.away_score) : a}
+            disabled={locked}
+            placeholder="–"
+            onChange={(e) => onChange(match.id, "a", e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            className={inputCls(parseScore(a) !== null)}
+          />
+        </div>
+        <div className="flex items-center gap-2.5 justify-end min-w-0">
+          <span className="font-anton uppercase tracking-tight text-base truncate text-right">{awayName}</span>
+          {match.away_iso && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={flagUrl(match.away_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+          )}
+        </div>
+      </div>
+
+      {/* Linha dos pênaltis (obrigatória — "seguro") */}
+      <div className="mt-3 pt-3 border-t border-dashed border-rule grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div className="text-right font-mono text-[10px] uppercase tracking-widest text-mute pr-1">
+          🥅 pênaltis
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={played && hadPens ? String(match.pen_home) : ph}
+            disabled={locked}
+            placeholder="–"
+            onChange={(e) => onChange(match.id, "ph", e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            className={inputCls(parseScore(ph) !== null)}
+          />
+          <span className="font-anton text-xl text-mute">×</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={played && hadPens ? String(match.pen_away) : pa}
+            disabled={locked}
+            placeholder="–"
+            onChange={(e) => onChange(match.id, "pa", e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            className={inputCls(parseScore(pa) !== null)}
+          />
+        </div>
+        <div className="font-serif italic text-[11px] text-soft pl-1">
+          só conta se o jogo for pra pênaltis
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KoRankingTab({
+  rankings,
+  currentUserId,
+}: {
+  rankings: KoRankingRow[];
+  currentUserId: string;
+}) {
+  if (rankings.length === 0) {
+    return (
+      <div className="max-w-[700px] mx-auto px-8 py-24 text-center">
+        <h2 className="font-anton text-4xl uppercase tracking-tight text-ink mb-4">
+          Ranking <span className="text-yellow">do mata-mata</span>
+        </h2>
+        <p className="font-serif italic text-soft leading-relaxed">
+          O ranking aparece quando o primeiro jogo do mata-mata for pontuado. Só entradas com Pix
+          aprovado disputam.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          Ranking <span className="text-yellow">do mata-mata</span>
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {rankings.length} {rankings.length === 1 ? "participante" : "participantes"}
+        </span>
+      </div>
+
+      <div className="border-2 border-ink">
+        <table className="w-full border-collapse">
+          <thead className="bg-ink text-paper">
+            <tr>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-12">#</th>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">Jogador</th>
+              <th className="hidden sm:table-cell text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">Campeão</th>
+              <th className="hidden sm:table-cell text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">Exatos</th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rankings.map((r) => {
+              const isMe = r.user_id === currentUserId;
+              return (
+                <tr key={r.user_id} className={["border-b border-rule last:border-b-0", isMe ? "bg-yellow/10" : ""].join(" ")}>
+                  <td className="py-3 px-3 font-anton text-base">
+                    <span className={r.position <= 3 ? "text-yellow" : "text-mute"}>{r.position}º</span>
+                  </td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2.5">
+                      {r.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover" />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute">
+                          {(r.name ?? "?").slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="font-anton uppercase tracking-tight text-sm text-ink">
+                        {r.name ?? "Sem nome"}
+                        {isMe && <span className="ml-1.5 font-mono text-[9px] tracking-widest text-yellow">VOCÊ</span>}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell py-3 px-3 font-mono text-xs text-soft">
+                    {r.champion_pick ?? "—"}
+                    {r.champion_points > 0 && <span className="ml-1 text-green">✓</span>}
+                  </td>
+                  <td className="hidden sm:table-cell py-3 px-3 text-right font-mono text-sm text-soft">{r.exact_hits}</td>
+                  <td className="py-3 px-3 text-right font-anton text-lg text-ink">{r.total_points}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-4 font-serif italic text-xs text-soft">
+        Por jogo: <b className="text-green">+3</b> placar exato · <b className="text-green">+1</b> resultado.
+        {" "}Nos pênaltis (quando há): <b className="text-green">+3</b> exato · <b className="text-green">+1</b> vencedor.
+        {" "}🏆 Acertar o campeão vale <b className="text-green">+5</b>.
+      </p>
+    </div>
+  );
+}
+
+function KoPixModal({
+  receiptFile,
+  setReceiptFile,
+  submitting,
+  error,
+  onClose,
+  onCopy,
+  onConfirm,
+}: {
+  receiptFile: File | null;
+  setReceiptFile: (f: File | null) => void;
+  submitting: boolean;
+  error: string | null;
+  onClose: () => void;
+  onCopy: () => void;
+  onConfirm: () => void;
+}) {
+  const pixKey = process.env.NEXT_PUBLIC_PIX_KEY ?? "Configure NEXT_PUBLIC_PIX_KEY";
+  const amount = process.env.NEXT_PUBLIC_PIX_AMOUNT ?? "50";
+
+  function copy() {
+    navigator.clipboard.writeText(pixKey).then(onCopy).catch(() => onCopy());
+  }
+  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    if (f && f.size > 5 * 1024 * 1024) {
+      alert("Arquivo muito grande (máx 5MB).");
+      e.target.value = "";
+      setReceiptFile(null);
+      return;
+    }
+    setReceiptFile(f);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-ink/60 z-50 grid place-items-center p-4" onClick={onClose}>
+      <div
+        className="bg-paper border-2 border-ink max-w-md w-full"
+        style={{ boxShadow: "8px 8px 0 #FFDF00" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-ink">
+          <h3 className="font-anton text-lg uppercase tracking-wider text-ink">🏆 Entrar no mata-mata · Pix</h3>
+          <button onClick={onClose} className="w-8 h-8 grid place-items-center text-soft hover:text-ink">✕</button>
+        </div>
+        <div className="p-6 text-center">
+          <div className="font-anton text-5xl text-ink mb-1">R$ {amount},00</div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-mute mb-6">
+            entrada da fase 2 · independente da fase de grupos
+          </div>
+
+          <div className="text-left mb-4">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-mute mb-2">► 1. Pague o Pix</div>
+            <button
+              onClick={copy}
+              className="w-full font-mono text-xs bg-paper2 px-4 py-3 border-2 border-dashed border-rule hover:bg-yellow/10 hover:border-yellow hover:text-ink transition-colors break-all"
+            >
+              {pixKey}
+            </button>
+            <div className="font-serif italic text-[11px] text-soft mt-1.5">Chave Pix CPF · clique para copiar</div>
+          </div>
+
+          <div className="text-left">
+            <div className="font-mono text-[10px] uppercase tracking-widest text-mute mb-2">► 2. Anexe o comprovante</div>
+            <label
+              className={[
+                "block p-4 border-2 border-dashed cursor-pointer transition-colors",
+                receiptFile ? "border-green bg-green/5 text-green" : "border-rule bg-paper2 text-soft hover:border-ink hover:text-ink",
+              ].join(" ")}
+            >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                onChange={onPick}
+                className="hidden"
+                disabled={submitting}
+              />
+              <div className="font-anton text-sm uppercase tracking-wider">
+                {receiptFile ? "✓ " + (receiptFile.name.length > 32 ? receiptFile.name.slice(0, 31) + "…" : receiptFile.name) : "Selecionar arquivo"}
+              </div>
+              <div className="font-serif italic text-[11px] mt-1 opacity-80">PNG, JPG, WEBP ou PDF · até 5 MB</div>
+            </label>
+          </div>
+
+          {error && (
+            <div className="mt-4 text-left border-l-4 border-red-600 bg-red-50 px-4 py-3">
+              <div className="font-anton text-[12px] uppercase tracking-wider text-red-700">Não foi possível enviar</div>
+              <p className="font-serif text-[13px] text-ink mt-1">{error}</p>
+            </div>
+          )}
+
+          <button
+            onClick={onConfirm}
+            disabled={!receiptFile || submitting}
+            className="w-full mt-5 px-4 py-3.5 bg-yellow text-ink font-anton text-sm uppercase tracking-wider border-2 border-yellow disabled:bg-rule disabled:border-rule disabled:text-mute disabled:cursor-not-allowed"
+          >
+            {submitting ? "Enviando..." : "Confirmar pagamento"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -378,6 +378,85 @@ export async function sendTestEmail(): Promise<{
   }
 }
 
+// ============================================================
+// FASE 2 — MATA-MATA
+// ============================================================
+
+/**
+ * Avisa o admin de um novo PIX da FASE 2 (mata-mata). Sem PDF de palpites
+ * (aposta-se a cada rodada, não há cartela fechada) — só os dados + o
+ * comprovante anexado pra conferência.
+ */
+export async function sendKoPixNotification(input: {
+  user_name: string;
+  user_email: string;
+  receipt?: { buffer: Buffer; filename: string; contentType: string };
+}): Promise<void> {
+  const subject = `[Bolão 26 · Mata-mata] Novo Pix — ${input.user_name}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #009739; margin-bottom: 4px;">Novo Pix · Fase 2 (Mata-mata)</h2>
+      <p style="color: #5a6a85; margin-top: 0;">Apostador aguardando aprovação da entrada do mata-mata.</p>
+      <hr style="border: none; border-top: 1px solid #d2dae5; margin: 16px 0;" />
+      <p style="margin: 4px 0;"><strong>Nome:</strong> ${escapeHtml(input.user_name)}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${escapeHtml(input.user_email)}</p>
+      <p style="margin: 4px 0;"><strong>Valor:</strong> R$ ${process.env.NEXT_PUBLIC_PIX_AMOUNT ?? "50"},00</p>
+      <p style="margin: 16px 0; color: #5a6a85;">Confira o comprovante anexo e aprove em /admin/mata-mata.</p>
+      <a href="${APP_URL}/admin/mata-mata" style="display:inline-block;background:#002776;color:white;padding:10px 18px;text-decoration:none;font-weight:bold;">Abrir painel do mata-mata →</a>
+    </div>
+  `;
+
+  const attachments: Attachment[] = [];
+  if (input.receipt) {
+    const ext = guessExt(input.receipt.contentType, input.receipt.filename);
+    attachments.push({
+      filename: `comprovante-mata-mata-${slugify(input.user_name)}${ext}`,
+      content: input.receipt.buffer,
+    });
+  }
+
+  await send({ to: adminEmail, subject, html, attachments });
+}
+
+/**
+ * Confirma ao apostador que a entrada da FASE 2 foi aprovada. Sem anexo —
+ * só o convite a palpitar cada rodada e o campeão.
+ */
+export async function sendKoApprovalNotification(input: {
+  user_name: string;
+  user_email: string;
+}): Promise<boolean> {
+  const firstName = escapeHtml(input.user_name.split(" ")[0]);
+  const subject = `[Bolão 26] Você está no Mata-mata 🏆`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #d2dae5;">
+      <div style="background:#002776; padding:28px 24px; text-align:center;">
+        <div style="font-size:12px; letter-spacing:2px; text-transform:uppercase; color:#FFDF00; font-weight:bold;">Bolão da Copa · 2026</div>
+        <div style="color:#ffffff; font-size:26px; font-weight:800; margin-top:8px;">Fase 2 confirmada 🏆</div>
+      </div>
+      <div style="padding:24px;">
+        <p style="margin-top:0;">Olá, ${firstName}! 👋</p>
+        <p>Confirmamos seu Pix — você está dentro do <strong>bolão do mata-mata</strong>.</p>
+        <div style="background:#f4f6f9; border-left:4px solid #009739; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">Como funciona:</strong><br/>
+          ⚽ Você palpita <strong>a cada rodada</strong> (16avos → final) — cada jogo abre quando os times são definidos e fecha <strong>1h antes do apito</strong>.<br/>
+          🥅 Em cada jogo você crava o placar (normal/prorrogação) <strong>e</strong> os pênaltis.<br/>
+          🏆 E aposta também no <strong>campeão</strong> — vale <strong>+5 pontos</strong> (trava antes do 1º jogo dos 16avos).
+        </div>
+        <div style="background:#f4f6f9; border-left:4px solid #002776; padding:14px 16px; margin:18px 0; font-size:14px;">
+          <strong style="color:#002776;">Pontuação:</strong><br/>
+          🎯 Placar exato: <strong>+3</strong> · ✅ Resultado certo: <strong>+1</strong><br/>
+          🥅 Nos pênaltis (se houver): placar exato <strong>+3</strong> · vencedor <strong>+1</strong>
+        </div>
+        <a href="${APP_URL}/copa" style="display:inline-block; background:#009739; color:white; padding:12px 20px; text-decoration:none; font-weight:bold; margin-top:6px;">Fazer meus palpites →</a>
+        <p style="color:#8092ab; font-size:12px; margin-top:20px;">Não perca o prazo do campeão — ele fecha quando começa o mata-mata.</p>
+      </div>
+    </div>
+  `;
+
+  return send({ to: input.user_email, subject, html });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

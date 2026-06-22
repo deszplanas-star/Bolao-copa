@@ -162,6 +162,12 @@ export default async function ChaveamentoPage() {
           <span className="flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-green border-b-2 border-green">
             Chaveamento
           </span>
+          <Link
+            href="/copa"
+            className="flex-shrink-0 px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-yellow hover:border-yellow border-b-2 border-transparent transition-colors"
+          >
+            🏆 Mata-mata
+          </Link>
         </div>
       </nav>
 
