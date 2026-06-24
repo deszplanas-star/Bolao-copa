@@ -962,17 +962,20 @@ function calcPrizes(rankings: RankingRow[]): Map<string, number> {
 
   const pool = n * ENTRY_CENTS;
   const lastPrize = ENTRY_CENTS;
-  const remaining = pool - lastPrize;
   const TOP_PCT = [0.70, 0.20, 0.10];
 
   const maxPos = Math.max(...rankings.map((r) => r.position));
   const lastPlayers = rankings.filter((r) => r.position === maxPos);
 
+  // Cada lanterna recupera os R$50 da PRÓPRIA aposta — não dividem um único
+  // prêmio. Por isso reservamos R$50 × nº de lanternas antes do pódio; o que
+  // sobra é o caixa do 70/20/10. (Bug anterior: dividia um só R$50 → R$25 cada.)
+  const remaining = pool - lastPrize * lastPlayers.length;
+
   const prizes = new Map<string, number>();
 
-  // Último(s): dividem R$50 igualmente
-  const lastShare = Math.floor(lastPrize / lastPlayers.length);
-  for (const p of lastPlayers) prizes.set(p.user_id, lastShare);
+  // Último(s): cada um recupera R$50 — "pelo menos não vai de graça".
+  for (const p of lastPlayers) prizes.set(p.user_id, lastPrize);
 
   // Top 3: empates agrupam as fatias combinadas
   let slot = 0;
