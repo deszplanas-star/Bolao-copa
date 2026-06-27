@@ -169,6 +169,12 @@ async function run(req: NextRequest) {
       continue;
     }
 
+    // Idempotência: jogo já finalizado no banco NÃO é mais tocado pelo cron.
+    // A football-data oscila placar/status por horas depois do FINISHED, o que
+    // re-finalizava o jogo e reenviava o push "Fim de jogo/GOL" em loop (caso
+    // Egito x Irã). Correção de placar pós-fim é manual no /admin (reopened).
+    if (mine.status === "finished") continue;
+
     // Traduz pro mando/visitante do NOSSO jogo (pode estar invertido)
     const ourHome = mine.home_team_id === tidHome ? hs : as;
     const ourAway = mine.home_team_id === tidHome ? as : hs;
