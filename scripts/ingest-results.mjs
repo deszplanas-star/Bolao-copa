@@ -175,6 +175,14 @@ async function main() {
       continue;
     }
 
+    // Idempotência: jogo já finalizado no banco NÃO é mais tocado. A
+    // football-data oscila placar/status por horas após o FINISHED, o que
+    // reenviava push "Fim de jogo/GOL" em loop. Correção pós-fim é manual.
+    if (ours.status === "finished") {
+      skipped++;
+      continue;
+    }
+
     // Traduz o placar para a perspectiva casa/fora do NOSSO jogo.
     const ourHome = ours.home_team_id === tidHome ? hs : as;
     const ourAway = ours.home_team_id === tidHome ? as : hs;
