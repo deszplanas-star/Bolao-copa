@@ -25,10 +25,9 @@ type Props = {
 };
 
 const TABS = [
-  { key: "apostas", label: "Apostas" },
+  { key: "apostas", label: "Minhas apostas" },
   { key: "ranking", label: "Ranking" },
   { key: "resultados", label: "Resultados" },
-  { key: "minhas", label: "Minhas apostas" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -82,7 +81,7 @@ export default function ApostasClient({
       const t = new URLSearchParams(window.location.search).get("tab");
       if (TABS.some((x) => x.key === t)) return t as TabKey;
     }
-    return "apostas";
+    return "ranking";
   });
   const initialGroup = groups[0]?.code ?? "A";
   const [currentGroup, setCurrentGroup] = useState<string>(initialGroup);
@@ -651,7 +650,6 @@ export default function ApostasClient({
           />
         )}
         {tab === "resultados" && <ResultadosTab matches={matches} />}
-        {tab === "minhas" && <MinhasApostasTab matches={matches} />}
       </main>
 
       {/* STICKY FOOT CTA */}

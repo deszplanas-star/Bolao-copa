@@ -26,9 +26,9 @@ const STAGES: { key: string; label: string }[] = [
 ];
 
 const TABS = [
-  { key: "apostas", label: "Apostas" },
-  { key: "resultado", label: "Resultados" },
+  { key: "apostas", label: "Minhas apostas" },
   { key: "ranking", label: "Ranking" },
+  { key: "resultado", label: "Resultados" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 

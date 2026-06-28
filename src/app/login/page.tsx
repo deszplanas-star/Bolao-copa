@@ -6,7 +6,7 @@ import { Suspense, useState } from "react";
 
 function LoginInner() {
   const params = useSearchParams();
-  const next = params.get("next") || "/apostas";
+  const next = params.get("next") || "/";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
