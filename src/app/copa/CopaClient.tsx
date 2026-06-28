@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { upsertChampion, upsertKoPrediction } from "./actions";
 import { submitKoPayment } from "./payment-actions";
+import PushBell from "@/components/PushBell";
 
 // Trava de tempo da fase 2: 1h antes do apito (no cliente, só pra UI; o
 // servidor revalida).
@@ -242,6 +243,7 @@ export default function CopaClient({
             <span className="text-yellow">mata-mata</span>
           </div>
           <div className="flex items-center gap-3 justify-end">
+            <PushBell onToast={setToast} />
             {isAdmin && (
               <Link
                 href="/admin/mata-mata"
