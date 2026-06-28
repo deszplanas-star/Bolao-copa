@@ -632,6 +632,8 @@ function KoMatchRow({
 }
 
 function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
+  const [openMatchId, setOpenMatchId] = useState<string | null>(null);
+  const openMatch = openMatchId ? matches.find((m) => m.id === openMatchId) ?? null : null;
   const playable = matches.filter((m) => m.home_name && m.away_name);
   const live = playable.filter((m) => m.status === "live");
   const finished = playable.filter(
@@ -670,7 +672,8 @@ function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
           return (
             <div
               key={m.id}
-              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"
+              onClick={() => setOpenMatchId(m.id)}
+              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3 cursor-pointer hover:border-ink transition-colors"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 {m.home_iso && (
@@ -731,6 +734,124 @@ function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
             </div>
           );
         })}
+      </div>
+      <p className="mt-4 font-serif italic text-xs text-soft">Toque num jogo para ver o palpite de todos.</p>
+      <KoMatchPredictionsModal match={openMatch} onClose={() => setOpenMatchId(null)} />
+    </div>
+  );
+}
+
+type KoPredRow = {
+  userId: string;
+  name: string;
+  avatar_url: string | null;
+  home_score: number;
+  away_score: number;
+  pen_home: number | null;
+  pen_away: number | null;
+  points: number;
+  computed: boolean;
+};
+
+function KoMatchPredictionsModal({
+  match,
+  onClose,
+}: {
+  match: KoMatchView | null;
+  onClose: () => void;
+}) {
+  const [preds, setPreds] = useState<KoPredRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!match) {
+      setPreds(null);
+      return;
+    }
+    setLoading(true);
+    fetch(`/api/ko-match-predictions/${match.id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setPreds(d.predictions ?? []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setPreds([]);
+        setLoading(false);
+      });
+  }, [match]);
+
+  if (!match) return null;
+  const hasScore = match.home_score !== null && match.away_score !== null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-ink/60 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-paper w-full sm:max-w-sm max-h-[80vh] overflow-y-auto border-t-4 sm:border-4 border-ink"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-4 py-3 border-b border-rule flex items-center justify-between sticky top-0 bg-paper z-10">
+          <div>
+            <p className="font-anton uppercase text-base text-ink">Palpites do jogo</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-mute">
+              {match.home_name} {hasScore ? `${match.home_score} × ${match.away_score}` : "×"} {match.away_name}
+            </p>
+          </div>
+          <button type="button" className="font-anton text-xl text-mute hover:text-ink leading-none" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="divide-y divide-rule">
+          {loading && <div className="p-6 text-center font-mono text-xs text-mute">carregando...</div>}
+          {!loading && preds && preds.length === 0 && (
+            <div className="p-6 text-center font-mono text-xs text-mute">ninguém palpitou nesse jogo 😅</div>
+          )}
+          {!loading &&
+            preds &&
+            preds.map((p, i) => {
+              const pen =
+                p.pen_home !== null && p.pen_away !== null ? ` (pên ${p.pen_home}-${p.pen_away})` : "";
+              return (
+                <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-anton text-xs text-mute w-5 text-right flex-shrink-0 tabular-nums">{i + 1}</span>
+                    {p.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.avatar_url} alt="" className="w-6 h-6 rounded-full border border-rule object-cover flex-shrink-0" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute flex-shrink-0">
+                        {(p.name ?? "?").slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="font-anton uppercase tracking-tight text-sm truncate">{p.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="font-mono text-sm whitespace-nowrap">
+                      {p.home_score} × {p.away_score}
+                      <span className="text-mute">{pen}</span>
+                    </span>
+                    <span
+                      className={[
+                        "font-anton text-[10px] px-1.5 py-0.5 whitespace-nowrap",
+                        !hasScore
+                          ? "bg-paper2 text-mute"
+                          : p.points >= 3
+                            ? "bg-green text-paper"
+                            : p.points >= 1
+                              ? "bg-yellow text-ink"
+                              : "bg-paper2 text-mute",
+                      ].join(" ")}
+                    >
+                      {!hasScore ? "–" : `+${p.points}`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
       </div>
     </div>
   );
@@ -809,7 +930,9 @@ function KoRankingTab({
                         />
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink">
-                        {r.name ?? "Sem nome"}
+                        <Link href={`/copa/${r.user_id}`} className="hover:text-yellow transition-colors">
+                          {r.name ?? "Sem nome"}
+                        </Link>
                         {isMe && <span className="ml-1.5 font-mono text-[9px] tracking-widest text-yellow">VOCÊ</span>}
                       </span>
                     </div>
