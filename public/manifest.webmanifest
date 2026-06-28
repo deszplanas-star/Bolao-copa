@@ -3,7 +3,7 @@
   "short_name": "Bolão 26",
   "description": "Apostas, ranking ao vivo e chaveamento da Copa do Mundo 2026.",
   "id": "/",
-  "start_url": "/apostas",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
