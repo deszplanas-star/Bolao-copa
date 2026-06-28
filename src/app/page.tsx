@@ -9,6 +9,7 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/apostas");
+  // Mata-mata é a entrada do app (fase atual). A fase de grupos fica em /apostas.
+  if (user) redirect("/copa");
   redirect("/home.html");
 }

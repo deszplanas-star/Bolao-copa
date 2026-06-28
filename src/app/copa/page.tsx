@@ -20,7 +20,7 @@ export default async function CopaPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/copa");
 
-  const [koRes, predsRes, payRes, rankRes, champRes, cfgRes, adminCheck] =
+  const [koRes, predsRes, payRes, rankRes, champRes, cfgRes, adminCheck, allChampRes] =
     await Promise.all([
       // Defensivo: antes da migration 0005/0008 ou do 1º ingest pode não existir.
       supabase.from("ko_matches").select("*").order("kickoff_at", { ascending: true }),
@@ -39,6 +39,8 @@ export default async function CopaPage() {
         .maybeSingle(),
       supabase.from("ko_config").select("champion_lock_at").eq("id", 1).maybeSingle(),
       getAuthedAdmin(),
+      // Palpite de campeão de TODOS — vira a bandeira antes do nome no ranking.
+      supabase.from("champion_predictions").select("user_id, team_iso, team_name"),
     ]);
 
   const ko = (koRes.error ? [] : (koRes.data ?? [])) as KoMatch[];
@@ -76,6 +78,16 @@ export default async function CopaPage() {
   }
   candidates.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
+  // user_id → bandeira do palpite de campeão (pro ranking do mata-mata).
+  const championByUser: Record<string, { iso: string; name: string }> = {};
+  for (const c of (allChampRes.data ?? []) as {
+    user_id: string;
+    team_iso: string | null;
+    team_name: string | null;
+  }[]) {
+    if (c.team_iso) championByUser[c.user_id] = { iso: c.team_iso, name: c.team_name ?? "" };
+  }
+
   return (
     <CopaClient
       user={{
@@ -94,6 +106,7 @@ export default async function CopaPage() {
       championLockAt={championLockAt}
       candidates={candidates}
       isAdmin={isAdmin}
+      championByUser={championByUser}
     />
   );
 }

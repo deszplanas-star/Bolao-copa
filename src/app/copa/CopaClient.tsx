@@ -27,6 +27,7 @@ const STAGES: { key: string; label: string }[] = [
 
 const TABS = [
   { key: "apostas", label: "Apostas" },
+  { key: "resultado", label: "Resultados" },
   { key: "ranking", label: "Ranking" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
@@ -71,6 +72,7 @@ type Props = {
   championLockAt: string | null;
   candidates: ChampionCandidate[];
   isAdmin: boolean;
+  championByUser: Record<string, { iso: string; name: string }>;
 };
 
 export default function CopaClient({
@@ -83,9 +85,11 @@ export default function CopaClient({
   championLockAt,
   candidates,
   isAdmin,
+  championByUser,
 }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("apostas");
+  // Login cai no Mata-mata; primeira tela = Ranking.
+  const [tab, setTab] = useState<TabKey>("ranking");
   const [now, setNow] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
 
@@ -110,9 +114,9 @@ export default function CopaClient({
     return () => clearInterval(id);
   }, []);
 
-  // Ranking ao vivo: recarrega do servidor a cada 30s na aba ranking.
+  // Ao vivo: recarrega do servidor a cada 30s nas abas ranking e resultados.
   useEffect(() => {
-    if (tab !== "ranking") return;
+    if (tab !== "ranking" && tab !== "resultado") return;
     const id = setInterval(() => router.refresh(), 30_000);
     return () => clearInterval(id);
   }, [tab, router]);
@@ -284,12 +288,6 @@ export default function CopaClient({
           >
             Fase de grupos
           </a>
-          <a
-            href="/chaveamento"
-            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
-          >
-            Chaveamento
-          </a>
         </div>
       </nav>
 
@@ -408,7 +406,10 @@ export default function CopaClient({
           </div>
         )}
 
-        {tab === "ranking" && <KoRankingTab rankings={rankings} currentUserId={currentUserId} />}
+        {tab === "resultado" && <KoResultadoTab matches={matches} />}
+        {tab === "ranking" && (
+          <KoRankingTab rankings={rankings} currentUserId={currentUserId} championByUser={championByUser} />
+        )}
       </main>
 
       {/* FOOTER CTA */}
@@ -630,12 +631,119 @@ function KoMatchRow({
   );
 }
 
+function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
+  const playable = matches.filter((m) => m.home_name && m.away_name);
+  const live = playable.filter((m) => m.status === "live");
+  const finished = playable.filter(
+    (m) => m.status === "finished" && m.home_score !== null && m.away_score !== null,
+  );
+  if (live.length === 0 && finished.length === 0) {
+    return (
+      <div className="max-w-[700px] mx-auto px-8 py-24 text-center">
+        <h2 className="font-anton text-4xl uppercase tracking-tight text-ink mb-4">
+          Mata-mata <span className="text-yellow">ainda não começou</span>
+        </h2>
+        <p className="font-serif italic text-soft leading-relaxed">
+          Os resultados aparecem aqui conforme os jogos acontecem. As Oitavas começam dia 28/06 — atualiza sozinho.
+        </p>
+      </div>
+    );
+  }
+  const list = [
+    ...live.map((m) => ({ m, isLive: true })),
+    ...finished.map((m) => ({ m, isLive: false })),
+  ];
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          <span className="text-yellow">Resultados</span> · mata-mata
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {live.length > 0 && <b className="text-green mr-2">● {live.length} ao vivo</b>}
+          {finished.length} {finished.length === 1 ? "jogo encerrado" : "jogos encerrados"}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {list.map(({ m, isLive }) => {
+          const hasPen = m.pen_home !== null && m.pen_away !== null;
+          return (
+            <div
+              key={m.id}
+              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {m.home_iso && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={flagUrl(m.home_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+                )}
+                <span className="font-anton uppercase tracking-tight text-base truncate">{m.home_name}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="font-anton text-2xl text-ink">
+                  {m.home_score ?? 0} <span className="text-mute text-base mx-1">×</span> {m.away_score ?? 0}
+                </div>
+                {hasPen && (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                    pên {m.pen_home} × {m.pen_away}
+                  </div>
+                )}
+                {isLive ? (
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-green font-bold">
+                    <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" /> Ao vivo
+                  </div>
+                ) : (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-mute">{fmtKickoff(m.kickoff_at)}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5 justify-end min-w-0">
+                <span className="font-anton uppercase tracking-tight text-base truncate text-right">{m.away_name}</span>
+                {m.away_iso && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={flagUrl(m.away_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+                )}
+              </div>
+              {m.prediction && (
+                <div className="col-span-3 pt-3 mt-1 border-t border-rule flex items-center justify-between font-mono text-[11px] uppercase tracking-widest">
+                  <span className="text-mute">
+                    seu palpite{" "}
+                    <b className="text-ink ml-1">
+                      {m.prediction.home_score} × {m.prediction.away_score}
+                    </b>
+                    {m.prediction.pen_home !== null && m.prediction.pen_away !== null
+                      ? ` (pên ${m.prediction.pen_home}-${m.prediction.pen_away})`
+                      : ""}
+                  </span>
+                  <span
+                    className={[
+                      "px-2 py-1 font-anton text-[10px]",
+                      (m.prediction.points ?? 0) >= 3
+                        ? "bg-green text-paper"
+                        : (m.prediction.points ?? 0) >= 1
+                          ? "bg-yellow text-ink"
+                          : "bg-paper2 text-mute",
+                    ].join(" ")}
+                  >
+                    +{m.prediction.points ?? 0} pts
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function KoRankingTab({
   rankings,
   currentUserId,
+  championByUser,
 }: {
   rankings: KoRankingRow[];
   currentUserId: string;
+  championByUser: Record<string, { iso: string; name: string }>;
 }) {
   if (rankings.length === 0) {
     return (
@@ -690,6 +798,15 @@ function KoRankingTab({
                         <span className="w-6 h-6 rounded-full bg-paper2 border border-rule grid place-items-center font-mono text-[10px] text-mute">
                           {(r.name ?? "?").slice(0, 1).toUpperCase()}
                         </span>
+                      )}
+                      {championByUser[r.user_id] && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={flagUrl(championByUser[r.user_id].iso, 20)}
+                          alt={championByUser[r.user_id].name}
+                          title={`Acha que ${championByUser[r.user_id].name} é campeã`}
+                          className="w-5 h-3.5 object-cover border border-rule flex-shrink-0"
+                        />
                       )}
                       <span className="font-anton uppercase tracking-tight text-sm text-ink">
                         {r.name ?? "Sem nome"}
