@@ -1,6 +1,17 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type { Group, Match, MatchView, Prediction, RankingRow, Team } from "@/lib/types";
+import type {
+  Group,
+  KoMatch,
+  KoMatchView,
+  KoPredictionFields,
+  KoRankingRow,
+  Match,
+  MatchView,
+  Prediction,
+  RankingRow,
+  Team,
+} from "@/lib/types";
 import ApostasClient from "./ApostasClient";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +23,19 @@ export default async function ApostasPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/apostas");
 
-  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes, userRowRes, championRes] =
-    await Promise.all([
+  const [
+    groupsRes,
+    teamsRes,
+    matchesRes,
+    predsRes,
+    paymentRes,
+    rankingsRes,
+    userRowRes,
+    championRes,
+    koMatchesRes,
+    koPredsRes,
+    koRankingsRes,
+  ] = await Promise.all([
       supabase.from("groups").select("*").order("ord", { ascending: true }),
       supabase.from("teams").select("*"),
       supabase.from("matches").select("*").order("kickoff_at", { ascending: true }),
@@ -35,8 +57,18 @@ export default async function ApostasPage() {
       // não existir (deploy antes da migration), o erro é ignorado e cai em false.
       supabase.from("users").select("edits_unlocked").eq("id", user.id).maybeSingle(),
       // Palpite de campeão de cada apostador — vira a bandeirinha antes do nome
-      // no ranking. Só lê iso+nome do time (público entre participantes).
+      // no ranking do mata-mata. Só lê iso+nome do time (público entre participantes).
       supabase.from("champion_predictions").select("user_id, team_iso, team_name"),
+      // Mata-mata (fase 2): jogos, meus palpites e ranking. Defensivo: antes do
+      // 1º ingest/migration as tabelas podem não existir — cai em lista vazia.
+      supabase.from("ko_matches").select("*").order("kickoff_at", { ascending: true }),
+      supabase
+        .from("ko_predictions")
+        .select(
+          "ko_match_id,home_score,away_score,pen_home,pen_away,normal_points,pen_points,points,computed_at",
+        )
+        .eq("user_id", user.id),
+      supabase.from("ko_rankings").select("*").order("position", { ascending: true }).limit(300),
     ]);
 
   const groups = (groupsRes.data ?? []) as Group[];
@@ -48,11 +80,23 @@ export default async function ApostasPage() {
   const rankings = (rankingsRes.data ?? []) as RankingRow[];
   const editsUnlocked = (userRowRes.data?.edits_unlocked as boolean | undefined) ?? false;
 
-  // user_id → palpite de campeão (bandeira + nome do time) pro ranking.
+  // user_id → palpite de campeão (bandeira + nome do time) pro ranking do mata-mata.
   const championByUser: Record<string, { iso: string; name: string }> = {};
   for (const c of (championRes.data ?? []) as { user_id: string; team_iso: string | null; team_name: string | null }[]) {
     if (c.team_iso) championByUser[c.user_id] = { iso: c.team_iso, name: c.team_name ?? "" };
   }
+
+  // Mata-mata: jogos + meu palpite de cada jogo, e o ranking da fase 2.
+  const koMatchesRaw = (koMatchesRes.error ? [] : (koMatchesRes.data ?? [])) as KoMatch[];
+  const koPreds = (koPredsRes.error ? [] : (koPredsRes.data ?? [])) as (KoPredictionFields & {
+    ko_match_id: string;
+  })[];
+  const koRankings = (koRankingsRes.error ? [] : (koRankingsRes.data ?? [])) as KoRankingRow[];
+  const koPredByMatch = new Map(koPreds.map((p) => [p.ko_match_id, p]));
+  const koMatches: KoMatchView[] = koMatchesRaw.map((m) => ({
+    ...m,
+    prediction: koPredByMatch.get(m.id) ?? null,
+  }));
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const predByMatch = new Map(preds.map((p) => [p.match_id, p]));
@@ -97,6 +141,8 @@ export default async function ApostasPage() {
       currentUserId={user.id}
       editsUnlocked={editsUnlocked}
       championByUser={championByUser}
+      koMatches={koMatches}
+      koRankings={koRankings}
     />
   );
 }

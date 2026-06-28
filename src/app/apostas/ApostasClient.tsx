@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Group, MatchView, RankingRow, Team } from "@/lib/types";
+import type { Group, KoMatchView, KoRankingRow, MatchView, RankingRow, Team } from "@/lib/types";
 import { computeStandings } from "@/lib/standings";
 import { isReopenWindowOpen } from "@/lib/reopen";
 import { deletePrediction, upsertPrediction } from "./actions";
@@ -23,6 +23,8 @@ type Props = {
   currentUserId: string;
   editsUnlocked: boolean;
   championByUser: Record<string, { iso: string; name: string }>;
+  koMatches: KoMatchView[];
+  koRankings: KoRankingRow[];
 };
 
 // Ordem da barra (a Copa entrou no mata-mata): Ranking é o landing e a Fase de
@@ -104,8 +106,12 @@ export default function ApostasClient({
   currentUserId,
   editsUnlocked,
   championByUser,
+  koMatches,
+  koRankings,
 }: Props) {
   const sealed = paymentStatus === "pending" || paymentStatus === "approved";
+  // Sub-aba dentro de "Fase de Grupos" (arquivo da fase 1, já encerrada).
+  const [grupoView, setGrupoView] = useState<"palpites" | "ranking" | "resultados">("palpites");
   // Aba inicial pode vir da URL (?tab=resultados) — é pra onde a notificação
   // de gol aponta, direto no jogo ao vivo. Sem parâmetro, abre no Ranking
   // (foco da fase de mata-mata).
@@ -440,8 +446,37 @@ export default function ApostasClient({
         </div>
       </nav>
 
-      {/* GROUP NAV (apenas aba apostas) */}
+      {/* SUB-ABAS da Fase de Grupos (arquivo da fase 1, já encerrada) */}
       {tab === "apostas" && (
+        <div className="bg-paper2 border-b border-rule overflow-x-auto flex-shrink-0">
+          <div className="max-w-[1280px] mx-auto px-8 flex items-center gap-1 py-2">
+            {([
+              ["palpites", "Meus palpites"],
+              ["ranking", "Ranking"],
+              ["resultados", "Resultados"],
+            ] as const).map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => setGrupoView(k)}
+                className={[
+                  "px-3 py-1.5 border font-anton text-xs uppercase tracking-wider transition-colors",
+                  grupoView === k
+                    ? "bg-ink text-paper border-ink"
+                    : "bg-paper text-soft border-rule hover:border-ink hover:text-ink",
+                ].join(" ")}
+              >
+                {l}
+              </button>
+            ))}
+            <span className="ml-2 font-serif italic text-[11px] text-mute whitespace-nowrap">
+              fase de grupos encerrada · arquivo
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* GROUP NAV (navegação de grupos — só na sub-aba de palpites) */}
+      {tab === "apostas" && grupoView === "palpites" && (
         <div className="bg-paper2 border-b border-rule overflow-x-auto flex-shrink-0">
           <div className="max-w-[1280px] mx-auto px-8 py-2.5 flex items-center gap-2">
             <span className="font-mono text-[10px] tracking-widest uppercase text-mute pr-2.5 border-r border-rule mr-1 whitespace-nowrap">
@@ -483,7 +518,7 @@ export default function ApostasClient({
 
       {/* CONTEÚDO */}
       <main className="flex-1 pb-32">
-        {tab === "apostas" && sealed && (
+        {tab === "apostas" && grupoView === "palpites" && sealed && (
           <div className="max-w-[1280px] mx-auto px-8 pt-6">
             <div
               className={[
@@ -511,7 +546,7 @@ export default function ApostasClient({
             </div>
           </div>
         )}
-        {tab === "apostas" && editsUnlocked && (
+        {tab === "apostas" && grupoView === "palpites" && editsUnlocked && (
           <div className="max-w-[1280px] mx-auto px-8 pt-4">
             <div className="border-l-4 border-yellow bg-yellow/10 px-5 py-4">
               <div className="font-anton uppercase tracking-wider text-sm text-ink">
@@ -526,7 +561,7 @@ export default function ApostasClient({
             </div>
           </div>
         )}
-        {tab === "apostas" && sealed && reopenedCount > 0 && reopenWindowOpen && (
+        {tab === "apostas" && grupoView === "palpites" && sealed && reopenedCount > 0 && reopenWindowOpen && (
           <div className="max-w-[1280px] mx-auto px-8 pt-4">
             <div className="border-l-4 border-green bg-green/10 px-5 py-4">
               <div className="font-anton uppercase tracking-wider text-sm text-ink">
@@ -542,7 +577,7 @@ export default function ApostasClient({
             </div>
           </div>
         )}
-        {tab === "apostas" && (
+        {tab === "apostas" && grupoView === "palpites" && (
           <div className="max-w-[1280px] mx-auto px-8 py-8 grid lg:grid-cols-[1fr_360px] gap-8">
             {/* Matches pane */}
             <div className="space-y-3">
@@ -676,19 +711,26 @@ export default function ApostasClient({
           </div>
         )}
 
+        {/* ===== Abas principais = MATA-MATA (fase 2) ===== */}
         {tab === "ranking" && (
-          <RankingTab
-            rankings={rankings}
+          <KoRankingView
+            rankings={koRankings}
             currentUserId={currentUserId}
-            totalMatches={matches.length}
             championByUser={championByUser}
           />
         )}
-        {tab === "resultados" && <ResultadosTab matches={matches} />}
-        {tab === "minhas" && <MinhasApostasTab matches={matches} />}
+        {tab === "resultados" && <KoResultadosView matches={koMatches} />}
+        {tab === "minhas" && <KoMinhasView matches={koMatches} />}
+
+        {/* ===== Fase de Grupos (arquivo) — sub-abas. "palpites" = grade acima ===== */}
+        {tab === "apostas" && grupoView === "ranking" && (
+          <RankingTab rankings={rankings} currentUserId={currentUserId} totalMatches={matches.length} />
+        )}
+        {tab === "apostas" && grupoView === "resultados" && <ResultadosTab matches={matches} />}
       </main>
 
-      {/* STICKY FOOT CTA */}
+      {/* STICKY FOOT CTA — só na grade de palpites da fase de grupos */}
+      {tab === "apostas" && grupoView === "palpites" && (
       <footer className="fixed bottom-0 left-0 right-0 bg-ink text-paper border-t-4 border-green z-30">
         <div className="max-w-[1280px] mx-auto px-8 py-3 flex items-center gap-4">
           <div className="flex-1 flex items-center gap-3 font-mono text-[11px] uppercase tracking-widest">
@@ -714,6 +756,7 @@ export default function ApostasClient({
           />
         </div>
       </footer>
+      )}
 
       {/* MODAL PIX */}
       {showPixModal && (
@@ -1032,16 +1075,293 @@ function fmtPrize(cents: number): string {
   }).format(cents / 100);
 }
 
+// ===================== MATA-MATA (fase 2) =====================
+
+function KoRankingView({
+  rankings,
+  currentUserId,
+  championByUser,
+}: {
+  rankings: KoRankingRow[];
+  currentUserId: string;
+  championByUser: Record<string, { iso: string; name: string }>;
+}) {
+  if (rankings.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Ranking <span className="text-yellow">do mata-mata</span>
+          </>
+        }
+        text="O ranking do mata-mata aparece quando o primeiro jogo da fase 2 for pontuado. As Oitavas começam dia 28/06. Só entradas com Pix aprovado disputam."
+      />
+    );
+  }
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          Ranking <span className="text-yellow">do mata-mata</span>
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {rankings.length} {rankings.length === 1 ? "participante" : "participantes"}
+        </span>
+      </div>
+      <div className="border-2 border-ink">
+        <table className="w-full border-collapse">
+          <thead className="bg-ink text-paper">
+            <tr>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-12">#</th>
+              <th className="text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">Jogador</th>
+              <th className="hidden sm:table-cell text-left font-mono text-[10px] uppercase tracking-widest py-2.5 px-3">Campeão</th>
+              <th className="hidden sm:table-cell text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">Exatos</th>
+              <th className="text-right font-mono text-[10px] uppercase tracking-widest py-2.5 px-3 w-14">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rankings.map((r) => {
+              const isMe = r.user_id === currentUserId;
+              const champ = championByUser[r.user_id];
+              return (
+                <tr
+                  key={r.user_id}
+                  className={["border-b border-rule last:border-b-0", isMe ? "bg-yellow/10" : ""].join(" ")}
+                >
+                  <td className="py-3 px-3 font-anton text-base">
+                    <span className={r.position <= 3 ? "text-yellow" : "text-mute"}>{r.position}º</span>
+                  </td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2.5">
+                      {champ ? (
+                        <img
+                          src={flagUrl(champ.iso, 20)}
+                          alt={champ.name}
+                          title={`Acha que ${champ.name} é campeã`}
+                          className="w-5 h-3.5 object-cover border border-rule flex-shrink-0"
+                        />
+                      ) : (
+                        <span
+                          className="w-5 h-3.5 border border-dashed border-rule flex-shrink-0"
+                          title="Ainda não palpitou o campeão"
+                        />
+                      )}
+                      <span className="font-anton uppercase tracking-tight text-sm text-ink">
+                        {r.name ?? "Sem nome"}
+                        {isMe && <span className="ml-1.5 font-mono text-[9px] tracking-widest text-yellow">VOCÊ</span>}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell py-3 px-3 font-mono text-xs text-soft">
+                    {r.champion_pick ?? "—"}
+                    {r.champion_points > 0 && <span className="ml-1 text-green">✓</span>}
+                  </td>
+                  <td className="hidden sm:table-cell py-3 px-3 text-right font-mono text-sm text-soft">{r.exact_hits}</td>
+                  <td className="py-3 px-3 text-right font-anton text-lg text-ink">{r.total_points}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 font-serif italic text-xs text-soft">
+        A bandeira ao lado do nome é o <b className="text-ink">palpite de campeão</b> de cada um. Por jogo:{" "}
+        <b className="text-green">+3</b> placar exato · <b className="text-green">+1</b> resultado ·{" "}
+        🏆 acertar o campeão vale <b className="text-green">+5</b>.
+      </p>
+    </div>
+  );
+}
+
+function KoResultadosView({ matches }: { matches: KoMatchView[] }) {
+  const nowMs = Date.now();
+  const playable = matches.filter((m) => m.home_name && m.away_name);
+  const live = playable.filter((m) => m.status === "live");
+  const finished = playable.filter(
+    (m) => m.status === "finished" && m.home_score !== null && m.away_score !== null,
+  );
+  if (live.length === 0 && finished.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Mata-mata <span className="text-yellow">ainda não começou</span>
+          </>
+        }
+        text="Os resultados do mata-mata aparecem aqui conforme os jogos acontecem. As Oitavas começam dia 28/06."
+      />
+    );
+  }
+  const list = [
+    ...live.map((m) => ({ m, isLive: true })),
+    ...finished.map((m) => ({ m, isLive: false })),
+  ];
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          <span className="text-yellow">Resultados</span> · mata-mata
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {live.length > 0 && <b className="text-green mr-2">● {live.length} ao vivo</b>}
+          {finished.length} {finished.length === 1 ? "jogo encerrado" : "jogos encerrados"}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {list.map(({ m, isLive }) => {
+          const hasPen = m.pen_home !== null && m.pen_away !== null;
+          return (
+            <div
+              key={m.id}
+              className="border border-rule bg-paper p-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                {m.home_iso && (
+                  <img src={flagUrl(m.home_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+                )}
+                <span className="font-anton uppercase tracking-tight text-base truncate">{m.home_name}</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="font-anton text-2xl text-ink">
+                  {m.home_score ?? 0} <span className="text-mute text-base mx-1">×</span> {m.away_score ?? 0}
+                </div>
+                {hasPen && (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                    pên {m.pen_home} × {m.pen_away}
+                  </div>
+                )}
+                {isLive && m.kickoff_at ? (
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-green font-bold">
+                    <span className="w-1.5 h-1.5 bg-green rounded-full animate-pulse" /> Ao vivo · {liveClock(m.kickoff_at, nowMs)}
+                  </div>
+                ) : m.kickoff_at ? (
+                  <div className="font-mono text-[9px] uppercase tracking-widest text-mute">{fmtKickoff(m.kickoff_at)}</div>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2.5 justify-end min-w-0">
+                <span className="font-anton uppercase tracking-tight text-base truncate text-right">{m.away_name}</span>
+                {m.away_iso && (
+                  <img src={flagUrl(m.away_iso, 80)} alt="" className="w-9 h-6 object-cover border border-rule flex-shrink-0" />
+                )}
+              </div>
+              {m.prediction && (
+                <div className="col-span-3 pt-3 mt-1 border-t border-rule flex items-center justify-between font-mono text-[11px] uppercase tracking-widest">
+                  <span className="text-mute">
+                    seu palpite{" "}
+                    <b className="text-ink ml-1">
+                      {m.prediction.home_score} × {m.prediction.away_score}
+                    </b>
+                    {m.prediction.pen_home !== null && m.prediction.pen_away !== null
+                      ? ` (pên ${m.prediction.pen_home}-${m.prediction.pen_away})`
+                      : ""}
+                  </span>
+                  <span
+                    className={[
+                      "px-2 py-1 font-anton text-[10px]",
+                      (m.prediction.points ?? 0) >= 3
+                        ? "bg-green text-paper"
+                        : (m.prediction.points ?? 0) >= 1
+                          ? "bg-yellow text-ink"
+                          : "bg-paper2 text-mute",
+                    ].join(" ")}
+                  >
+                    +{m.prediction.points ?? 0} pts
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function KoMinhasView({ matches }: { matches: KoMatchView[] }) {
+  const mine = matches.filter((m) => m.prediction !== null);
+  const totalPoints = mine.reduce((s, m) => s + (m.prediction?.points ?? 0), 0);
+  const resolved = mine.filter((m) => m.prediction?.computed_at);
+  if (mine.length === 0) {
+    return (
+      <EmptyTab
+        title={
+          <>
+            Sem <span className="text-yellow">palpites</span> no mata-mata
+          </>
+        }
+        text="Vá em 🏆 Mata-mata e faça seus palpites de cada fase (e o palpite de campeão). Eles aparecem aqui."
+      />
+    );
+  }
+  return (
+    <div className="max-w-[860px] mx-auto px-8 py-10">
+      <div className="flex items-baseline justify-between mb-6">
+        <h2 className="font-anton text-3xl uppercase tracking-tight text-ink">
+          Minhas <span className="text-yellow">apostas</span> · mata-mata
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-mute">
+          {mine.length} palpite{mine.length !== 1 ? "s" : ""} · {totalPoints} pts
+        </span>
+      </div>
+      <div className="space-y-2">
+        {mine.map((m) => {
+          const computed = !!m.prediction?.computed_at;
+          const pts = m.prediction?.points ?? 0;
+          return (
+            <div
+              key={m.id}
+              className="border border-rule bg-paper p-3 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-3"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {m.home_iso && (
+                  <img src={flagUrl(m.home_iso, 80)} alt="" className="w-7 h-5 object-cover border border-rule flex-shrink-0" />
+                )}
+                <span className="font-anton uppercase tracking-tight text-sm truncate">{m.home_name ?? "A definir"}</span>
+              </div>
+              <div className="font-anton text-lg text-ink whitespace-nowrap">
+                {m.prediction?.home_score} <span className="text-mute mx-0.5">×</span> {m.prediction?.away_score}
+              </div>
+              <div className="flex items-center gap-2 justify-end min-w-0">
+                <span className="font-anton uppercase tracking-tight text-sm truncate text-right">{m.away_name ?? "A definir"}</span>
+                {m.away_iso && (
+                  <img src={flagUrl(m.away_iso, 80)} alt="" className="w-7 h-5 object-cover border border-rule flex-shrink-0" />
+                )}
+              </div>
+              <div className="text-right min-w-[70px]">
+                {computed ? (
+                  <span
+                    className={[
+                      "inline-block px-2 py-1 font-anton text-[11px] uppercase tracking-wider",
+                      pts >= 3 ? "bg-green text-paper" : pts >= 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
+                    ].join(" ")}
+                  >
+                    +{pts}
+                  </span>
+                ) : (
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-mute">
+                    {m.kickoff_at ? fmtKickoff(m.kickoff_at) : "a definir"}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-4 font-serif italic text-xs text-soft">
+        Resolvidos: {resolved.length}/{mine.length}. Para apostar nas próximas fases, use a aba 🏆 Mata-mata.
+      </p>
+    </div>
+  );
+}
+
 function RankingTab({
   rankings,
   currentUserId,
   totalMatches,
-  championByUser,
 }: {
   rankings: RankingRow[];
   currentUserId: string;
   totalMatches: number;
-  championByUser: Record<string, { iso: string; name: string }>;
 }) {
   const prizes = calcPrizes(rankings);
   const maxPos = rankings.length > 0 ? Math.max(...rankings.map((r) => r.position)) : 0;
@@ -1153,14 +1473,6 @@ function RankingTab({
                               </span>
                             )}
                           </span>
-                        )}
-                        {championByUser[r.user_id] && (
-                          <img
-                            src={flagUrl(championByUser[r.user_id].iso, 20)}
-                            alt={championByUser[r.user_id].name}
-                            title={`Acha que ${championByUser[r.user_id].name} é campeã`}
-                            className="w-5 h-3.5 object-cover border border-rule flex-shrink-0"
-                          />
                         )}
                         <Link href={`/apostas/${r.user_id}`} className="hover:text-green transition-colors">{r.name ?? "Sem nome"}</Link>
                         {(r.penalty_points ?? 0) > 0 && (
