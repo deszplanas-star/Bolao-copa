@@ -283,10 +283,10 @@ export default function CopaClient({
             </button>
           ))}
           <a
-            href="/apostas"
+            href="/"
             className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
           >
-            Fase de grupos
+            ‹ Início
           </a>
         </div>
       </nav>
