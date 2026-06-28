@@ -22,18 +22,48 @@ type Props = {
   rankings: RankingRow[];
   currentUserId: string;
   editsUnlocked: boolean;
+  championByUser: Record<string, { iso: string; name: string }>;
 };
 
+// Ordem da barra (a Copa entrou no mata-mata): Ranking é o landing e a Fase de
+// Grupos foi pro fim. "apostas" continua sendo a grade de palpites de grupos —
+// só o rótulo virou "Fase de Grupos".
 const TABS = [
-  { key: "apostas", label: "Apostas" },
   { key: "ranking", label: "Ranking" },
   { key: "resultados", label: "Resultados" },
   { key: "minhas", label: "Minhas apostas" },
+  { key: "apostas", label: "Fase de Grupos" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
 
 const flagUrl = (iso: string, w = 80) => `https://flagcdn.com/w${w}/${iso}.png`;
+
+// Botão de aba da barra superior (mesmo estilo dos links Mata-mata/Chaveamento).
+function NavTab({
+  label,
+  active,
+  onClick,
+  badge,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px flex items-center gap-2 transition-colors",
+        active ? "text-green border-green" : "text-soft border-transparent hover:text-ink",
+      ].join(" ")}
+    >
+      {label}
+      {badge}
+    </button>
+  );
+}
 
 function parseScore(v: string): number | null {
   if (v === "") return null;
@@ -73,16 +103,18 @@ export default function ApostasClient({
   rankings,
   currentUserId,
   editsUnlocked,
+  championByUser,
 }: Props) {
   const sealed = paymentStatus === "pending" || paymentStatus === "approved";
   // Aba inicial pode vir da URL (?tab=resultados) — é pra onde a notificação
-  // de gol aponta, direto no jogo ao vivo.
+  // de gol aponta, direto no jogo ao vivo. Sem parâmetro, abre no Ranking
+  // (foco da fase de mata-mata).
   const [tab, setTab] = useState<TabKey>(() => {
     if (typeof window !== "undefined") {
       const t = new URLSearchParams(window.location.search).get("tab");
       if (TABS.some((x) => x.key === t)) return t as TabKey;
     }
-    return "apostas";
+    return "ranking";
   });
   const initialGroup = groups[0]?.code ?? "A";
   const [currentGroup, setCurrentGroup] = useState<string>(initialGroup);
@@ -353,42 +385,37 @@ export default function ApostasClient({
       {/* TABS */}
       <nav className="bg-paper border-b border-rule sticky top-0 z-20 overflow-x-auto flex-shrink-0">
         <div className="max-w-[1280px] mx-auto px-8 flex">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={[
-                "px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px flex items-center gap-2 transition-colors",
-                tab === t.key
-                  ? "text-green border-green"
-                  : "text-soft border-transparent hover:text-ink",
-              ].join(" ")}
-            >
-              {t.label}
-              {t.key === "apostas" && (
-                <span
-                  className={[
-                    "font-mono text-[9px] px-[7px] py-[2px] tracking-wider",
-                    tab === "apostas" ? "bg-green text-paper" : "bg-paper3 text-ink",
-                  ].join(" ")}
-                >
-                  {totalFilled}/{requiredTotal}
-                </span>
-              )}
-            </button>
-          ))}
-          <a
-            href="/chaveamento"
-            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
-          >
-            Chaveamento
-          </a>
+          {/* Ordem (foco mata-mata): Ranking · Mata-mata · Resultados · Minhas apostas · Chaveamento · Fase de Grupos */}
+          <NavTab label="Ranking" active={tab === "ranking"} onClick={() => setTab("ranking")} />
           <a
             href="/copa"
             className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-yellow border-transparent hover:border-yellow transition-colors"
           >
             🏆 Mata-mata
           </a>
+          <NavTab label="Resultados" active={tab === "resultados"} onClick={() => setTab("resultados")} />
+          <NavTab label="Minhas apostas" active={tab === "minhas"} onClick={() => setTab("minhas")} />
+          <a
+            href="/chaveamento"
+            className="px-[18px] py-[14px] font-anton text-[13px] uppercase tracking-wider whitespace-nowrap border-b-[3px] -mb-px text-soft border-transparent hover:text-ink transition-colors"
+          >
+            Chaveamento
+          </a>
+          <NavTab
+            label="Fase de Grupos"
+            active={tab === "apostas"}
+            onClick={() => setTab("apostas")}
+            badge={
+              <span
+                className={[
+                  "font-mono text-[9px] px-[7px] py-[2px] tracking-wider",
+                  tab === "apostas" ? "bg-green text-paper" : "bg-paper3 text-ink",
+                ].join(" ")}
+              >
+                {totalFilled}/{requiredTotal}
+              </span>
+            }
+          />
           <div className="flex-1" />
           {tab === "apostas" && (
             <div className="flex gap-0.5 items-center pr-4">
@@ -654,6 +681,7 @@ export default function ApostasClient({
             rankings={rankings}
             currentUserId={currentUserId}
             totalMatches={matches.length}
+            championByUser={championByUser}
           />
         )}
         {tab === "resultados" && <ResultadosTab matches={matches} />}
@@ -1008,10 +1036,12 @@ function RankingTab({
   rankings,
   currentUserId,
   totalMatches,
+  championByUser,
 }: {
   rankings: RankingRow[];
   currentUserId: string;
   totalMatches: number;
+  championByUser: Record<string, { iso: string; name: string }>;
 }) {
   const prizes = calcPrizes(rankings);
   const maxPos = rankings.length > 0 ? Math.max(...rankings.map((r) => r.position)) : 0;
@@ -1123,6 +1153,14 @@ function RankingTab({
                               </span>
                             )}
                           </span>
+                        )}
+                        {championByUser[r.user_id] && (
+                          <img
+                            src={flagUrl(championByUser[r.user_id].iso, 20)}
+                            alt={championByUser[r.user_id].name}
+                            title={`Acha que ${championByUser[r.user_id].name} é campeã`}
+                            className="w-5 h-3.5 object-cover border border-rule flex-shrink-0"
+                          />
                         )}
                         <Link href={`/apostas/${r.user_id}`} className="hover:text-green transition-colors">{r.name ?? "Sem nome"}</Link>
                         {(r.penalty_points ?? 0) > 0 && (

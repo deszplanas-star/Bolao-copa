@@ -12,7 +12,7 @@ export default async function ApostasPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/apostas");
 
-  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes, userRowRes] =
+  const [groupsRes, teamsRes, matchesRes, predsRes, paymentRes, rankingsRes, userRowRes, championRes] =
     await Promise.all([
       supabase.from("groups").select("*").order("ord", { ascending: true }),
       supabase.from("teams").select("*"),
@@ -34,6 +34,9 @@ export default async function ApostasPage() {
       // Flag de liberação de edição individual. Defensivo: se a coluna ainda
       // não existir (deploy antes da migration), o erro é ignorado e cai em false.
       supabase.from("users").select("edits_unlocked").eq("id", user.id).maybeSingle(),
+      // Palpite de campeão de cada apostador — vira a bandeirinha antes do nome
+      // no ranking. Só lê iso+nome do time (público entre participantes).
+      supabase.from("champion_predictions").select("user_id, team_iso, team_name"),
     ]);
 
   const groups = (groupsRes.data ?? []) as Group[];
@@ -44,6 +47,12 @@ export default async function ApostasPage() {
     (paymentRes.data?.status as "pending" | "approved" | "denied" | undefined) ?? null;
   const rankings = (rankingsRes.data ?? []) as RankingRow[];
   const editsUnlocked = (userRowRes.data?.edits_unlocked as boolean | undefined) ?? false;
+
+  // user_id → palpite de campeão (bandeira + nome do time) pro ranking.
+  const championByUser: Record<string, { iso: string; name: string }> = {};
+  for (const c of (championRes.data ?? []) as { user_id: string; team_iso: string | null; team_name: string | null }[]) {
+    if (c.team_iso) championByUser[c.user_id] = { iso: c.team_iso, name: c.team_name ?? "" };
+  }
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const predByMatch = new Map(preds.map((p) => [p.match_id, p]));
@@ -87,6 +96,7 @@ export default async function ApostasPage() {
       rankings={rankings}
       currentUserId={user.id}
       editsUnlocked={editsUnlocked}
+      championByUser={championByUser}
     />
   );
 }
