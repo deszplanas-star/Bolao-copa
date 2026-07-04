@@ -55,9 +55,11 @@ export async function POST(req: NextRequest) {
   // tempo e o dedup — usado pra reenviar o consolidado de um jogo específico
   // (ex.: correção no template, palpite de última hora que ficou de fora).
   let forcedId: string | null = null;
+  let nota: string | null = null;
   try {
     const body = await req.json();
     if (body && typeof body.ko_match_id === "string") forcedId = body.ko_match_id;
+    if (body && typeof body.nota === "string" && body.nota.trim()) nota = body.nota.trim();
   } catch {
     // sem body = fluxo normal do cron
   }
@@ -158,20 +160,21 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
       .map((p) => {
         const pr = predByUser.get(p.id);
+        // 3 LINHAS por palpite (pedido do Davidson): TN / TT / PN, uma embaixo
+        // da outra. Nos 16avos (sem TN coletado) são 2 linhas: TT / PN.
         let palpite = '<span style="color:#b00;">sem palpite</span>';
         if (pr) {
-          const pn =
-            pr.pen_home !== null && pr.pen_away !== null
-              ? ` · <span style="color:#888;">PN ${pr.pen_home}-${pr.pen_away}</span>`
-              : "";
-          const tn = newModel
-            ? `TN ${pr.reg_home ?? "–"}×${pr.reg_away ?? "–"} · `
-            : "";
-          palpite = `${tn}<b>TT ${pr.home_score}×${pr.away_score}</b>${pn}`;
+          const linhas: string[] = [];
+          if (newModel) linhas.push(`<div>TN ${pr.reg_home ?? "–"} × ${pr.reg_away ?? "–"}</div>`);
+          linhas.push(`<div><b>TT ${pr.home_score} × ${pr.away_score}</b></div>`);
+          if (pr.pen_home !== null && pr.pen_away !== null) {
+            linhas.push(`<div style="color:#888;">PN ${pr.pen_home} × ${pr.pen_away}</div>`);
+          }
+          palpite = linhas.join("");
         }
         return `<tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;">${esc(p.name)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap;">${palpite}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top;">${esc(p.name)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap;line-height:1.5;">${palpite}</td>
         </tr>`;
       })
       .join("");
@@ -183,6 +186,11 @@ export async function POST(req: NextRequest) {
         <b>${esc(title)}</b> — ${esc(fmtKickoff(m.kickoff_at as string))} (BRT). As apostas
         deste jogo acabaram de fechar (30 min antes do apito). Veja o palpite de cada um:
       </p>
+      ${
+        nota
+          ? `<div style="background:#fff3f3;border-left:4px solid #b00020;padding:12px 16px;margin:12px 0;font-size:14px;">${esc(nota)}</div>`
+          : ""
+      }
       <p style="color:#8092ab;font-size:12px;margin-top:0;">
         <b>TN</b> = tempo normal (90 min) · <b>TT</b> = tempo total (placar final com prorrogação) · <b>PN</b> = pênaltis
       </p>
@@ -202,7 +210,7 @@ export async function POST(req: NextRequest) {
         from: process.env.GMAIL_FROM ?? `Bolão 26 <${GMAIL_USER}>`,
         to: GMAIL_USER,
         bcc: recipients,
-        subject: `[Bolão 26] Apostas fechadas: ${title} 🏆`,
+        subject: `[Bolão 26] ${nota ? "Correção — apostas fechadas" : "Apostas fechadas"}: ${title} 🏆`,
         html,
       });
       await db.from("admin_logs").insert({
