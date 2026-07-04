@@ -114,8 +114,9 @@ async function run(req: NextRequest) {
       .select("id, home_team_id, away_team_id, home_score, away_score, status"),
     // Estado anterior do mata-mata: necessário pra detectar gol/início/fim
     // (o ramo ko só espelhava o placar — não notificava). home_score/away_score
-    // são o tempo normal (pênaltis ficam em pen_*).
-    db.from("ko_matches").select("fd_id, home_score, away_score, status"),
+    // são o tempo normal (pênaltis ficam em pen_*). Nomes: pra preservar
+    // preenchimento manual e detectar inversão de mando pela API.
+    db.from("ko_matches").select("fd_id, home_name, away_name, home_score, away_score, status"),
   ]);
   const isoToId = new Map((teams ?? []).map((t) => [t.iso_code as string, t.id as string]));
   const byPair = new Map(
@@ -203,27 +204,46 @@ async function run(req: NextRequest) {
           : "scheduled";
       const prevKo = koByFd.get(am.id); // estado anterior (pra detectar gol/início/fim)
 
-      const { error } = await db.from("ko_matches").upsert(
-        {
-          fd_id: am.id,
-          stage: am.stage,
-          home_name: homeTla ? (TLA_TO_NAME[homeTla] ?? am.homeTeam?.name) : null,
-          away_name: awayTla ? (TLA_TO_NAME[awayTla] ?? am.awayTeam?.name) : null,
-          home_iso: homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null,
-          away_iso: awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null,
-          kickoff_at: am.utcDate ?? null,
-          home_score: normalHome,
-          away_score: normalAway,
-          reg_home: regHome,
-          reg_away: regAway,
-          went_to_et: wentToEt,
-          pen_home: penHome,
-          pen_away: penAway,
-          status: koStatus,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "fd_id" },
-      );
+      // ⚠️ MANDO E PREENCHIMENTO MANUAL: a football-data demora a preencher os
+      // confrontos do chaveamento (Portugal×Espanha definido no mundo real e a
+      // API ainda vazia, 03/07). Quando preenchemos à mão no banco, o upsert
+      // NÃO pode voltar os nomes pra NULL — então os campos de nome/iso só
+      // entram no payload quando a API tem os times. E se a API chegar com o
+      // mando INVERTIDO vs o banco (palpites já apontam pro mando do banco),
+      // mantemos o mando do banco e TRADUZIMOS os placares — nunca inverter em
+      // silêncio o significado dos palpites de todo mundo.
+      const apiHomeName = homeTla ? (TLA_TO_NAME[homeTla] ?? am.homeTeam?.name ?? null) : null;
+      const apiAwayName = awayTla ? (TLA_TO_NAME[awayTla] ?? am.awayTeam?.name ?? null) : null;
+      const swapped =
+        !!apiHomeName &&
+        !!apiAwayName &&
+        !!prevKo?.home_name &&
+        apiHomeName === prevKo.away_name &&
+        apiAwayName === prevKo.home_name;
+      if (swapped) problems.push(`ko ${am.id}: mando invertido na API — mantido o do banco`);
+
+      const row: Record<string, unknown> = {
+        fd_id: am.id,
+        stage: am.stage,
+        kickoff_at: am.utcDate ?? null,
+        home_score: swapped ? normalAway : normalHome,
+        away_score: swapped ? normalHome : normalAway,
+        reg_home: swapped ? regAway : regHome,
+        reg_away: swapped ? regHome : regAway,
+        went_to_et: wentToEt,
+        pen_home: swapped ? penAway : penHome,
+        pen_away: swapped ? penHome : penAway,
+        status: koStatus,
+        updated_at: new Date().toISOString(),
+      };
+      if (!swapped && apiHomeName && apiAwayName) {
+        row.home_name = apiHomeName;
+        row.away_name = apiAwayName;
+        row.home_iso = homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null;
+        row.away_iso = awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null;
+      }
+
+      const { error } = await db.from("ko_matches").upsert(row, { onConflict: "fd_id" });
       if (error) {
         problems.push(`ko ${am.id}: ${error.message.slice(0, 80)}`);
         continue;

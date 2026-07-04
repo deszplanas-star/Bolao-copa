@@ -172,10 +172,6 @@ async function main() {
     const row = {
       fd_id: am.id,
       stage: am.stage,
-      home_name: homeTla ? (TLA_TO_NAME[homeTla] ?? am.homeTeam?.name) : null,
-      away_name: awayTla ? (TLA_TO_NAME[awayTla] ?? am.awayTeam?.name) : null,
-      home_iso: homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null,
-      away_iso: awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null,
       kickoff_at: am.utcDate ?? null,
       home_score: normalHome,
       away_score: normalAway,
@@ -187,6 +183,15 @@ async function main() {
       status: DONE.has(am.status) ? "finished" : LIVE.has(am.status) ? "live" : "scheduled",
       updated_at: new Date().toISOString(),
     };
+    // Nomes/iso só entram quando a API define os times — confronto preenchido
+    // à mão no banco não pode voltar a NULL (o upsert só atualiza campos
+    // presentes). Detecção de mando invertido fica só no cron-ingest/route.ts.
+    if (homeTla && awayTla) {
+      row.home_name = TLA_TO_NAME[homeTla] ?? am.homeTeam?.name;
+      row.away_name = TLA_TO_NAME[awayTla] ?? am.awayTeam?.name;
+      row.home_iso = TLA_TO_ISO[homeTla] ?? null;
+      row.away_iso = TLA_TO_ISO[awayTla] ?? null;
+    }
     try {
       await sb("ko_matches?on_conflict=fd_id", {
         method: "POST",
