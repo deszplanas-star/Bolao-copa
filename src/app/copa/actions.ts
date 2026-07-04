@@ -9,12 +9,12 @@ import { createClient } from "@/lib/supabase/server";
 // Diferenças importantes pra fase 1 (apostas/actions.ts):
 //  - NÃO existe trava de "aposta selada": aqui aposta-se A CADA RODADA, então
 //    o palpite fica editável até o jogo travar.
-//  - A trava é por TEMPO: fecha 1 HORA antes do apito (na fase 1 é 5 min).
+//  - A trava é por TEMPO: fecha 30 MIN antes do apito (na fase 1 é 5 min).
 //  - Cada palpite tem 4 placares OBRIGATÓRIOS: normal/prorrogação + pênaltis.
 // ============================================================
 
-// Trava: 1 hora antes do kickoff (vs. 5 min na fase de grupos).
-const KO_CUTOFF_MS = 60 * 60 * 1000;
+// Trava: 30 minutos antes do kickoff (vs. 5 min na fase de grupos).
+const KO_CUTOFF_MS = 30 * 60 * 1000;
 
 const upsertKoSchema = z.object({
   ko_match_id: z.string().uuid(),
@@ -44,7 +44,7 @@ function isKoLocked(status: string, kickoff_at: string | null): boolean {
 
 /**
  * Salva/atualiza o palpite de UM jogo do mata-mata. Bloqueia só pela trava de
- * tempo (1h antes do apito). Os pênaltis são obrigatórios — funcionam como
+ * tempo (30 min antes do apito). Os pênaltis são obrigatórios — funcionam como
  * "seguro": só pontuam se o jogo de fato for pra disputa.
  */
 export async function upsertKoPrediction(input: unknown): Promise<ActionResult> {
@@ -65,7 +65,7 @@ export async function upsertKoPrediction(input: unknown): Promise<ActionResult> 
   if (mErr || !match) return { ok: false, error: "Jogo não encontrado." };
 
   if (isKoLocked(match.status as string, match.kickoff_at as string | null)) {
-    return { ok: false, error: "Apostas para este jogo já estão fechadas (fecha 1h antes)." };
+    return { ok: false, error: "Apostas para este jogo já estão fechadas (fecha 30 min antes)." };
   }
 
   const { error } = await supabase.from("ko_predictions").upsert(

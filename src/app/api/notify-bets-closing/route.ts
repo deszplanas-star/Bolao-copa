@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // ============================================================
-// Email "apostas fechadas" do MATA-MATA. Dispara quando um jogo entra na
-// última 1h antes do apito (= momento em que a aposta fecha, KO_CUTOFF_MS).
+// Email "apostas fechadas" do MATA-MATA. Dispara quando um jogo entra nos
+// últimos 30 min antes do apito (= momento em que a aposta fecha, KO_CUTOFF_MS).
 // Manda pra TODOS os participantes (entrada da fase 2 aprovada) uma tabela
 // com o palpite de cada um naquele jogo. Idempotente: registra o envio em
 // admin_logs (action='ko_bets_email', target_id=ko_match_id) e nunca repete.
@@ -15,7 +15,7 @@ export const maxDuration = 60;
 // ============================================================
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://bolao-copa-pu3k.vercel.app";
-const CUTOFF_MS = 60 * 60 * 1000; // 1h antes — igual à trava das apostas do mata-mata
+const CUTOFF_MS = 30 * 60 * 1000; // 30 min antes — igual à trava das apostas do mata-mata
 
 function esc(s: unknown) {
   return String(s ?? "")
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   const db = createAdminClient();
   if (!db) return NextResponse.json({ error: "service role ausente" }, { status: 500 });
 
-  // 1) Jogos do mata-mata que ENTRARAM na última 1h (aposta fechando) e ainda
+  // 1) Jogos do mata-mata que ENTRARAM nos últimos 30 min (aposta fechando) e ainda
   //    não começaram. Só os que já têm os dois times definidos.
   const limitIso = new Date(now + CUTOFF_MS).toISOString();
   const nowIso = new Date(now).toISOString();
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       <h2 style="color:#FF8C00;margin-bottom:2px;">🏆 Apostas fechadas · Mata-mata</h2>
       <p style="color:#5a6a85;margin-top:0;">
         <b>${esc(title)}</b> — ${esc(fmtKickoff(m.kickoff_at as string))} (BRT). As apostas
-        deste jogo acabaram de fechar (1h antes do apito). Veja o palpite de cada um:
+        deste jogo acabaram de fechar (30 min antes do apito). Veja o palpite de cada um:
       </p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead><tr style="background:#002776;color:#fff;">

@@ -13,9 +13,9 @@ import { upsertChampion, upsertKoPrediction } from "./actions";
 import { submitKoPayment } from "./payment-actions";
 import PushBell from "@/components/PushBell";
 
-// Trava de tempo da fase 2: 1h antes do apito (no cliente, só pra UI; o
+// Trava de tempo da fase 2: 30 min antes do apito (no cliente, só pra UI; o
 // servidor revalida).
-const KO_CUTOFF_MS = 60 * 60 * 1000;
+const KO_CUTOFF_MS = 30 * 60 * 1000;
 
 const STAGES: { key: string; label: string }[] = [
   { key: "LAST_32", label: "16 avos de final" },

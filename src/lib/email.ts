@@ -439,7 +439,7 @@ export async function sendKoApprovalNotification(input: {
         <p>Confirmamos seu Pix — você está dentro do <strong>bolão do mata-mata</strong>.</p>
         <div style="background:#f4f6f9; border-left:4px solid #009739; padding:14px 16px; margin:18px 0; font-size:14px;">
           <strong style="color:#002776;">Como funciona:</strong><br/>
-          ⚽ Você palpita <strong>a cada rodada</strong> (16avos → final) — cada jogo abre quando os times são definidos e fecha <strong>1h antes do apito</strong>.<br/>
+          ⚽ Você palpita <strong>a cada rodada</strong> (16avos → final) — cada jogo abre quando os times são definidos e fecha <strong>30 min antes do apito</strong>.<br/>
           🥅 Em cada jogo você crava o placar (normal/prorrogação) <strong>e</strong> os pênaltis.<br/>
           🏆 E aposta também no <strong>campeão</strong> — vale <strong>+5 pontos</strong> (trava antes do 1º jogo dos 16avos).
         </div>

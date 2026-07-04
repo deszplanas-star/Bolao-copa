@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 
 const flagUrl = (iso: string) => `https://flagcdn.com/w80/${iso}.png`;
 
-// Mesma trava do mata-mata (copa/actions.ts): jogo fecha 1h antes do apito, ou
-// quando deixa de estar "scheduled". Sem horário definido = ainda aberto.
+// Mesma trava do mata-mata (copa/actions.ts): jogo fecha 30 min antes do apito,
+// ou quando deixa de estar "scheduled". Sem horário definido = ainda aberto.
 // Usada pra esconder de TERCEIROS os palpites de jogos ainda abertos (anti-cópia).
-const KO_CUTOFF_MS = 60 * 60 * 1000;
+const KO_CUTOFF_MS = 30 * 60 * 1000;
 function isKoLocked(status: string, kickoff_at: string | null): boolean {
   if (!kickoff_at) return false;
   if (status !== "scheduled") return true;
@@ -66,7 +66,7 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
   const resolved = rows.filter((r) => r.p?.computed_at);
 
   // Quem está olhando. O dono vê os próprios palpites todos; terceiros só veem
-  // os jogos JÁ TRAVADOS (1h antes do apito) — anti-cópia.
+  // os jogos JÁ TRAVADOS (30 min antes do apito) — anti-cópia.
   const isOwn = user.id === params.userId;
   const visibleRows = isOwn
     ? rows
@@ -133,7 +133,7 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
           <p className="font-serif italic text-soft">
             {rows.length === 0
               ? "Nenhum palpite no mata-mata ainda."
-              : "🔒 Os palpites deste apostador aparecem aqui assim que cada jogo trava (1h antes do apito)."}
+              : "🔒 Os palpites deste apostador aparecem aqui assim que cada jogo trava (30 min antes do apito)."}
           </p>
         ) : (
           <div className="space-y-2">
