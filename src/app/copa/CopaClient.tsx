@@ -9,6 +9,7 @@ import type {
   KoMatchView,
   KoRankingRow,
 } from "@/lib/types";
+import { koPtsBadge, koPtsLabel } from "@/lib/ko-badge";
 import { upsertChampion, upsertKoPrediction } from "./actions";
 import { submitKoPayment } from "./payment-actions";
 import PushBell from "@/components/PushBell";
@@ -604,18 +605,19 @@ function KoMatchRow({
     parseScore(h) !== null && parseScore(a) !== null && parseScore(ph) !== null && parseScore(pa) !== null;
   const complete = baseComplete && (!newModel || (parseScore(rh) !== null && parseScore(ra) !== null));
 
-  const pts = match.prediction?.computed_at != null ? match.prediction.points : null;
+  const pred = match.prediction;
+  const pts = pred?.computed_at != null ? pred.points : null;
 
   const status = undefinedMatch ? (
     <span className="font-mono text-[10px] uppercase tracking-widest text-mute">confronto a definir</span>
-  ) : pts != null ? (
+  ) : pred && pts != null ? (
     <span
       className={[
         "font-anton text-[11px] px-2 py-0.5 uppercase tracking-wider",
-        pts >= 3 ? "bg-green text-paper" : pts >= 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
+        koPtsBadge(pts),
       ].join(" ")}
     >
-      +{pts} pt{pts !== 1 ? "s" : ""}
+      {koPtsLabel(pred, newModel)}
     </span>
   ) : timeLocked ? (
     <span className="font-mono text-[10px] uppercase tracking-widest text-red-600">apostas fechadas</span>
@@ -842,15 +844,11 @@ function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
                   </span>
                   <span
                     className={[
-                      "px-2 py-1 font-anton text-[10px]",
-                      (m.prediction.points ?? 0) >= 3
-                        ? "bg-green text-paper"
-                        : (m.prediction.points ?? 0) >= 1
-                          ? "bg-yellow text-ink"
-                          : "bg-paper2 text-mute",
+                      "px-2 py-1 font-anton text-[10px] whitespace-nowrap",
+                      koPtsBadge(m.prediction.points ?? 0),
                     ].join(" ")}
                   >
-                    +{m.prediction.points ?? 0} pts
+                    {koPtsLabel(m.prediction, newModel)}
                   </span>
                 </div>
               )}
@@ -977,16 +975,10 @@ function KoMatchPredictionsModal({
                     <span
                       className={[
                         "font-anton text-[10px] px-1.5 py-0.5 whitespace-nowrap",
-                        !hasScore
-                          ? "bg-paper2 text-mute"
-                          : p.points >= 3
-                            ? "bg-green text-paper"
-                            : p.points >= 1
-                              ? "bg-yellow text-ink"
-                              : "bg-paper2 text-mute",
+                        !hasScore ? "bg-paper2 text-mute" : koPtsBadge(p.points),
                       ].join(" ")}
                     >
-                      {!hasScore ? "–" : `+${p.points}`}
+                      {!hasScore ? "–" : koPtsLabel(p, newModel)}
                     </span>
                   </div>
                 </div>

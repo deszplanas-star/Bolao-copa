@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { KoMatch, KoPredictionFields } from "@/lib/types";
+import { koPtsBadge, koPtsLabel } from "@/lib/ko-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -182,14 +183,14 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
                     )}
                   </div>
                   <div className="text-right min-w-[70px]">
-                    {computed ? (
+                    {computed && p ? (
                       <span
                         className={[
-                          "inline-block px-2 py-1 font-anton text-[11px] uppercase tracking-wider",
-                          pts >= 3 ? "bg-green text-paper" : pts >= 1 ? "bg-yellow text-ink" : "bg-paper2 text-mute",
+                          "inline-block px-2 py-1 font-anton text-[11px] uppercase tracking-wider whitespace-nowrap",
+                          koPtsBadge(pts),
                         ].join(" ")}
                       >
-                        +{pts}
+                        {koPtsLabel(p, newModel)}
                       </span>
                     ) : (
                       <span className="font-mono text-[9px] uppercase tracking-widest text-mute">
