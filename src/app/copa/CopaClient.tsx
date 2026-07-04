@@ -689,7 +689,7 @@ function KoMatchRow({
       {newModel && (
         <div className="space-y-3 mb-3">
           <ScoreLine
-            label="⏱ tempo normal"
+            label="⏱ TN · tempo normal"
             hint="placar dos 90 minutos"
             left={played ? (regResult ?? "") : rh}
             right={played ? (regResultAway ?? "") : ra}
@@ -702,15 +702,15 @@ function KoMatchRow({
           {played && !match.went_to_et ? (
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
               <div className="text-right font-mono text-[10px] uppercase tracking-widest text-mute pr-1">
-                ⏱+ prorrogação
+                ⏱+ TT · tempo total
               </div>
               <div className="text-center font-serif italic text-[11px] text-soft">não houve</div>
               <div />
             </div>
           ) : (
             <ScoreLine
-              label="⏱+ prorrogação"
-              hint="placar TOTAL ao fim da prorrogação (já inclui os gols dos 90 min) · só conta se o jogo for à prorrogação"
+              label="⏱+ TT · tempo total"
+              hint="placar TOTAL do jogo ao fim da prorrogação (já inclui os gols dos 90 min) · só conta se o jogo for à prorrogação"
               left={played ? String(match.home_score) : h}
               right={played ? String(match.away_score) : a}
               leftFilled={parseScore(h) !== null}
@@ -726,7 +726,7 @@ function KoMatchRow({
       {/* Pênaltis (obrigatório — "seguro") */}
       <div className={newModel ? "pt-3 border-t border-dashed border-rule" : "mt-3 pt-3 border-t border-dashed border-rule"}>
         <ScoreLine
-          label="🥅 pênaltis"
+          label="🥅 PN · pênaltis"
           hint="só conta se o jogo for pra pênaltis"
           left={played && hadPens ? String(match.pen_home) : ph}
           right={played && hadPens ? String(match.pen_away) : pa}
@@ -799,12 +799,12 @@ function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
                 </div>
                 {newModel && m.went_to_et && m.reg_home !== null && (
                   <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
-                    90′ {m.reg_home} × {m.reg_away}
+                    TN {m.reg_home} × {m.reg_away}
                   </div>
                 )}
                 {hasPen && (
                   <div className="font-mono text-[9px] uppercase tracking-widest text-mute">
-                    pên {m.pen_home} × {m.pen_away}
+                    PN {m.pen_home} × {m.pen_away}
                   </div>
                 )}
                 {isLive ? (
@@ -828,18 +828,18 @@ function KoResultadoTab({ matches }: { matches: KoMatchView[] }) {
                     seu palpite{" "}
                     {newModel ? (
                       <b className="text-ink ml-1">
-                        90′ {m.prediction.reg_home ?? "–"} × {m.prediction.reg_away ?? "–"}
+                        TN {m.prediction.reg_home ?? "–"} × {m.prediction.reg_away ?? "–"}
                         <span className="font-normal text-mute">
-                          {" "}· prorr {m.prediction.home_score} × {m.prediction.away_score}
+                          {" "}· TT {m.prediction.home_score} × {m.prediction.away_score}
                         </span>
                       </b>
                     ) : (
                       <b className="text-ink ml-1">
-                        {m.prediction.home_score} × {m.prediction.away_score}
+                        TT {m.prediction.home_score} × {m.prediction.away_score}
                       </b>
                     )}
                     {m.prediction.pen_home !== null && m.prediction.pen_away !== null
-                      ? ` (pên ${m.prediction.pen_home}-${m.prediction.pen_away})`
+                      ? ` · PN ${m.prediction.pen_home}-${m.prediction.pen_away}`
                       : ""}
                   </span>
                   <span
@@ -939,7 +939,7 @@ function KoMatchPredictionsModal({
             preds &&
             preds.map((p, i) => {
               const pen =
-                p.pen_home !== null && p.pen_away !== null ? ` (pên ${p.pen_home}-${p.pen_away})` : "";
+                p.pen_home !== null && p.pen_away !== null ? ` · PN ${p.pen_home}-${p.pen_away}` : "";
               const newModel = isNewModel(match.stage);
               return (
                 <div key={p.userId} className="px-4 py-2.5 flex items-center justify-between gap-3">
@@ -959,16 +959,16 @@ function KoMatchPredictionsModal({
                     {newModel ? (
                       <span className="font-mono text-right whitespace-nowrap leading-tight">
                         <span className="text-sm">
-                          {p.reg_home ?? "–"} × {p.reg_away ?? "–"}
+                          TN {p.reg_home ?? "–"} × {p.reg_away ?? "–"}
                         </span>
                         <span className="block text-[10px] text-mute">
-                          prorr {p.home_score} × {p.away_score}
+                          TT {p.home_score} × {p.away_score}
                           {pen}
                         </span>
                       </span>
                     ) : (
                       <span className="font-mono text-sm whitespace-nowrap">
-                        {p.home_score} × {p.away_score}
+                        TT {p.home_score} × {p.away_score}
                         <span className="text-mute">{pen}</span>
                       </span>
                     )}
@@ -1084,10 +1084,11 @@ function KoRankingTab({
       </div>
 
       <p className="mt-4 font-serif italic text-xs text-soft">
-        Tempo normal: <b className="text-green">+3</b> placar exato · <b className="text-green">+1</b> resultado.
-        {" "}<b>Das oitavas em diante</b>, a prorrogação vale outros <b className="text-green">+3</b>/<b className="text-green">+1</b>
-        {" "}(placar ao fim da prorrogação — só conta se o jogo for à prorrogação).
-        {" "}Pênaltis (quando há): <b className="text-green">+3</b> exato · <b className="text-green">+1</b> vencedor.
+        <b>TN</b> (tempo normal, 90 min): <b className="text-green">+3</b> placar exato · <b className="text-green">+1</b> resultado.
+        {" "}<b>Das oitavas em diante</b>, o <b>TT</b> (tempo total — placar do jogo ao fim da prorrogação) vale outros <b className="text-green">+3</b>/<b className="text-green">+1</b>
+        {" "}(só conta se o jogo for à prorrogação).
+        {" "}<b>PN</b> (pênaltis, quando há): <b className="text-green">+3</b> exato · <b className="text-green">+1</b> vencedor.
+        {" "}Nos 16avos o palpite tem 2 placares (TT + PN); das oitavas em diante são 3 (TN + TT + PN).
         {" "}🏆 Acertar o campeão vale <b className="text-green">+5</b>.
       </p>
     </div>

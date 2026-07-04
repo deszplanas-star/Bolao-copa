@@ -51,31 +51,56 @@ export async function POST(req: NextRequest) {
   const db = createAdminClient();
   if (!db) return NextResponse.json({ error: "service role ausente" }, { status: 500 });
 
-  // 1) Jogos do mata-mata que ENTRARAM nos últimos 30 min (aposta fechando) e ainda
-  //    não começaram. Só os que já têm os dois times definidos.
-  const limitIso = new Date(now + CUTOFF_MS).toISOString();
-  const nowIso = new Date(now).toISOString();
-  const { data: koMatches, error: kmErr } = await db
-    .from("ko_matches")
-    .select("id, home_name, away_name, kickoff_at, stage, status")
-    .eq("status", "scheduled")
-    .not("kickoff_at", "is", null)
-    .gt("kickoff_at", nowIso)
-    .lte("kickoff_at", limitIso);
-  if (kmErr) return NextResponse.json({ error: kmErr.message }, { status: 500 });
-  const candidates = (koMatches ?? []).filter((m) => m.home_name && m.away_name);
-  if (candidates.length === 0) return NextResponse.json({ skip: "nenhum jogo fechando agora" });
+  // Reenvio MANUAL: POST com body {"ko_match_id": "..."} ignora a janela de
+  // tempo e o dedup — usado pra reenviar o consolidado de um jogo específico
+  // (ex.: correção no template, palpite de última hora que ficou de fora).
+  let forcedId: string | null = null;
+  try {
+    const body = await req.json();
+    if (body && typeof body.ko_match_id === "string") forcedId = body.ko_match_id;
+  } catch {
+    // sem body = fluxo normal do cron
+  }
 
-  // 2) Dedup: quais desses já tiveram o email enviado (admin_logs).
-  const ids = candidates.map((m) => m.id as string);
-  const { data: sentLogs } = await db
-    .from("admin_logs")
-    .select("target_id")
-    .eq("action", "ko_bets_email")
-    .in("target_id", ids);
-  const alreadySent = new Set((sentLogs ?? []).map((l) => l.target_id as string));
-  const toSend = candidates.filter((m) => !alreadySent.has(m.id as string));
-  if (toSend.length === 0) return NextResponse.json({ skip: "todos já notificados" });
+  let toSend: { id: unknown; home_name: unknown; away_name: unknown; kickoff_at: unknown; stage: unknown }[];
+  if (forcedId) {
+    const { data: forced, error: fErr } = await db
+      .from("ko_matches")
+      .select("id, home_name, away_name, kickoff_at, stage, status")
+      .eq("id", forcedId)
+      .maybeSingle();
+    if (fErr) return NextResponse.json({ error: fErr.message }, { status: 500 });
+    if (!forced || !forced.home_name || !forced.away_name) {
+      return NextResponse.json({ error: "jogo não encontrado ou sem times definidos" }, { status: 404 });
+    }
+    toSend = [forced];
+  } else {
+    // 1) Jogos do mata-mata que ENTRARAM nos últimos 30 min (aposta fechando) e ainda
+    //    não começaram. Só os que já têm os dois times definidos.
+    const limitIso = new Date(now + CUTOFF_MS).toISOString();
+    const nowIso = new Date(now).toISOString();
+    const { data: koMatches, error: kmErr } = await db
+      .from("ko_matches")
+      .select("id, home_name, away_name, kickoff_at, stage, status")
+      .eq("status", "scheduled")
+      .not("kickoff_at", "is", null)
+      .gt("kickoff_at", nowIso)
+      .lte("kickoff_at", limitIso);
+    if (kmErr) return NextResponse.json({ error: kmErr.message }, { status: 500 });
+    const candidates = (koMatches ?? []).filter((m) => m.home_name && m.away_name);
+    if (candidates.length === 0) return NextResponse.json({ skip: "nenhum jogo fechando agora" });
+
+    // 2) Dedup: quais desses já tiveram o email enviado (admin_logs).
+    const ids = candidates.map((m) => m.id as string);
+    const { data: sentLogs } = await db
+      .from("admin_logs")
+      .select("target_id")
+      .eq("action", "ko_bets_email")
+      .in("target_id", ids);
+    const alreadySent = new Set((sentLogs ?? []).map((l) => l.target_id as string));
+    toSend = candidates.filter((m) => !alreadySent.has(m.id as string));
+    if (toSend.length === 0) return NextResponse.json({ skip: "todos já notificados" });
+  }
 
   // 3) Participantes do mata-mata = entrada (ko_payments) aprovada.
   const { data: pays } = await db.from("ko_payments").select("user_id").eq("status", "approved");
@@ -119,10 +144,11 @@ export async function POST(req: NextRequest) {
 
   for (const m of toSend) {
     const matchId = m.id as string;
-    // Palpites de TODOS naquele jogo.
+    const newModel = (m.stage as string) !== "LAST_32"; // oitavas+ = 3 placares
+    // Palpites de TODOS naquele jogo (TN = reg_*, TT = home/away, PN = pen_*).
     const { data: preds } = await db
       .from("ko_predictions")
-      .select("user_id, home_score, away_score, pen_home, pen_away")
+      .select("user_id, home_score, away_score, reg_home, reg_away, pen_home, pen_away")
       .eq("ko_match_id", matchId);
     const predByUser = new Map((preds ?? []).map((p) => [p.user_id as string, p]));
 
@@ -134,15 +160,18 @@ export async function POST(req: NextRequest) {
         const pr = predByUser.get(p.id);
         let palpite = '<span style="color:#b00;">sem palpite</span>';
         if (pr) {
-          const pen =
+          const pn =
             pr.pen_home !== null && pr.pen_away !== null
-              ? ` <span style="color:#888;">(pên ${pr.pen_home}-${pr.pen_away})</span>`
+              ? ` · <span style="color:#888;">PN ${pr.pen_home}-${pr.pen_away}</span>`
               : "";
-          palpite = `<b>${pr.home_score} × ${pr.away_score}</b>${pen}`;
+          const tn = newModel
+            ? `TN ${pr.reg_home ?? "–"}×${pr.reg_away ?? "–"} · `
+            : "";
+          palpite = `${tn}<b>TT ${pr.home_score}×${pr.away_score}</b>${pn}`;
         }
         return `<tr>
           <td style="padding:6px 8px;border-bottom:1px solid #eee;">${esc(p.name)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${palpite}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;white-space:nowrap;">${palpite}</td>
         </tr>`;
       })
       .join("");
@@ -153,6 +182,9 @@ export async function POST(req: NextRequest) {
       <p style="color:#5a6a85;margin-top:0;">
         <b>${esc(title)}</b> — ${esc(fmtKickoff(m.kickoff_at as string))} (BRT). As apostas
         deste jogo acabaram de fechar (30 min antes do apito). Veja o palpite de cada um:
+      </p>
+      <p style="color:#8092ab;font-size:12px;margin-top:0;">
+        <b>TN</b> = tempo normal (90 min) · <b>TT</b> = tempo total (placar final com prorrogação) · <b>PN</b> = pênaltis
       </p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;">
         <thead><tr style="background:#002776;color:#fff;">

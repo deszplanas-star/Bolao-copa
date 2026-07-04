@@ -158,18 +158,18 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
                   <div className="font-anton text-lg text-ink whitespace-nowrap text-center">
                     {newModel ? (
                       <>
-                        90′ {p?.reg_home ?? "–"} <span className="text-mute mx-0.5">×</span> {p?.reg_away ?? "–"}
+                        TN {p?.reg_home ?? "–"} <span className="text-mute mx-0.5">×</span> {p?.reg_away ?? "–"}
                         <span className="block font-mono text-[9px] text-mute tracking-widest">
-                          prorr {p?.home_score}-{p?.away_score}
-                          {hasPen ? ` · pên ${p?.pen_home}-${p?.pen_away}` : ""}
+                          TT {p?.home_score}-{p?.away_score}
+                          {hasPen ? ` · PN ${p?.pen_home}-${p?.pen_away}` : ""}
                         </span>
                       </>
                     ) : (
                       <>
-                        {p?.home_score} <span className="text-mute mx-0.5">×</span> {p?.away_score}
+                        TT {p?.home_score} <span className="text-mute mx-0.5">×</span> {p?.away_score}
                         {hasPen && (
                           <span className="block font-mono text-[9px] text-mute tracking-widest">
-                            pên {p?.pen_home}-{p?.pen_away}
+                            PN {p?.pen_home}-{p?.pen_away}
                           </span>
                         )}
                       </>
