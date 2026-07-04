@@ -8,6 +8,16 @@ export const dynamic = "force-dynamic";
 
 const flagUrl = (iso: string) => `https://flagcdn.com/w80/${iso}.png`;
 
+// Mesma trava do mata-mata (copa/actions.ts): jogo fecha 1h antes do apito, ou
+// quando deixa de estar "scheduled". Sem horário definido = ainda aberto.
+// Usada pra esconder de TERCEIROS os palpites de jogos ainda abertos (anti-cópia).
+const KO_CUTOFF_MS = 60 * 60 * 1000;
+function isKoLocked(status: string, kickoff_at: string | null): boolean {
+  if (!kickoff_at) return false;
+  if (status !== "scheduled") return true;
+  return new Date(kickoff_at).getTime() - Date.now() <= KO_CUTOFF_MS;
+}
+
 function fmtKickoff(iso: string | null) {
   if (!iso) return "a definir";
   return new Date(iso).toLocaleString("pt-BR", {
@@ -29,7 +39,7 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
   const db = createAdminClient();
   if (!db) return <div className="p-8 font-mono text-sm">Erro: admin client indisponível</div>;
 
-  const [koRes, predsRes, targetRes, champRes] = await Promise.all([
+  const [koRes, predsRes, targetRes, champRes, cfgRes] = await Promise.all([
     db.from("ko_matches").select("*").order("kickoff_at", { ascending: true }),
     db.from("ko_predictions").select("*").eq("user_id", params.userId),
     db.from("users").select("id, name, avatar_url").eq("id", params.userId).maybeSingle(),
@@ -38,6 +48,7 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
       .select("team_iso, team_name")
       .eq("user_id", params.userId)
       .maybeSingle(),
+    db.from("ko_config").select("champion_lock_at").eq("id", 1).maybeSingle(),
   ]);
 
   const target = targetRes.data;
@@ -53,6 +64,18 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
     .filter((r) => r.p);
   const totalPoints = rows.reduce((s, r) => s + (r.p?.points ?? 0), 0);
   const resolved = rows.filter((r) => r.p?.computed_at);
+
+  // Quem está olhando. O dono vê os próprios palpites todos; terceiros só veem
+  // os jogos JÁ TRAVADOS (1h antes do apito) — anti-cópia.
+  const isOwn = user.id === params.userId;
+  const visibleRows = isOwn
+    ? rows
+    : rows.filter((r) => isKoLocked(r.m.status as string, r.m.kickoff_at as string | null));
+  const hiddenCount = rows.length - visibleRows.length;
+  // Palpite de campeão também é copiável: só aparece pra terceiros depois de travar.
+  const champLockAt = cfgRes.data?.champion_lock_at as string | null | undefined;
+  const championLocked = !!champLockAt && Date.now() >= new Date(champLockAt).getTime();
+  const showChampion = isOwn || championLocked;
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
@@ -97,7 +120,7 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
           </div>
         </div>
 
-        {champion?.team_iso && (
+        {showChampion && champion?.team_iso && (
           <div className="flex items-center gap-2 mb-6 border-2 border-ink bg-paper2 px-4 py-3">
             <span className="font-mono text-[10px] uppercase tracking-widest text-mute">Campeão:</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -106,14 +129,19 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
           </div>
         )}
 
-        {rows.length === 0 ? (
-          <p className="font-serif italic text-soft">Nenhum palpite no mata-mata ainda.</p>
+        {visibleRows.length === 0 ? (
+          <p className="font-serif italic text-soft">
+            {rows.length === 0
+              ? "Nenhum palpite no mata-mata ainda."
+              : "🔒 Os palpites deste apostador aparecem aqui assim que cada jogo trava (1h antes do apito)."}
+          </p>
         ) : (
           <div className="space-y-2">
-            {rows.map(({ m, p }) => {
+            {visibleRows.map(({ m, p }) => {
               const pts = p?.points ?? 0;
               const computed = !!p?.computed_at;
               const hasPen = p?.pen_home !== null && p?.pen_away !== null;
+              const newModel = m.stage !== "LAST_32"; // oitavas+ = 3 camadas
               return (
                 <div
                   key={m.id}
@@ -127,11 +155,23 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
                     <span className="font-anton uppercase tracking-tight text-sm truncate">{m.home_name ?? "A definir"}</span>
                   </div>
                   <div className="font-anton text-lg text-ink whitespace-nowrap text-center">
-                    {p?.home_score} <span className="text-mute mx-0.5">×</span> {p?.away_score}
-                    {hasPen && (
-                      <span className="block font-mono text-[9px] text-mute tracking-widest">
-                        pên {p?.pen_home}-{p?.pen_away}
-                      </span>
+                    {newModel ? (
+                      <>
+                        90′ {p?.reg_home ?? "–"} <span className="text-mute mx-0.5">×</span> {p?.reg_away ?? "–"}
+                        <span className="block font-mono text-[9px] text-mute tracking-widest">
+                          prorr {p?.home_score}-{p?.away_score}
+                          {hasPen ? ` · pên ${p?.pen_home}-${p?.pen_away}` : ""}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {p?.home_score} <span className="text-mute mx-0.5">×</span> {p?.away_score}
+                        {hasPen && (
+                          <span className="block font-mono text-[9px] text-mute tracking-widest">
+                            pên {p?.pen_home}-{p?.pen_away}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
                   <div className="flex items-center gap-2 justify-end min-w-0">
@@ -162,7 +202,10 @@ export default async function CopaUserPage({ params }: { params: { userId: strin
             })}
           </div>
         )}
-        <p className="mt-4 font-serif italic text-xs text-soft">{resolved.length} jogo(s) já apurado(s).</p>
+        <p className="mt-4 font-serif italic text-xs text-soft">
+          {resolved.length} jogo(s) já apurado(s).
+          {hiddenCount > 0 && ` · 🔒 ${hiddenCount} palpite(s) de jogo(s) ainda aberto(s) oculto(s) até travar.`}
+        </p>
       </main>
     </div>
   );

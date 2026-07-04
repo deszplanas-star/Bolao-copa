@@ -20,6 +20,10 @@ const upsertKoSchema = z.object({
   ko_match_id: z.string().uuid(),
   home_score: z.number().int().min(0).max(99),
   away_score: z.number().int().min(0).max(99),
+  // Placar do tempo normal (90 min). Obrigatório da oitava em diante; nos
+  // 16avos não é usado (vem ausente). Ver migration 0009.
+  reg_home: z.number().int().min(0).max(99).optional(),
+  reg_away: z.number().int().min(0).max(99).optional(),
   pen_home: z.number().int().min(0).max(99),
   pen_away: z.number().int().min(0).max(99),
 });
@@ -70,6 +74,8 @@ export async function upsertKoPrediction(input: unknown): Promise<ActionResult> 
       ko_match_id: parsed.data.ko_match_id,
       home_score: parsed.data.home_score,
       away_score: parsed.data.away_score,
+      reg_home: parsed.data.reg_home ?? null,
+      reg_away: parsed.data.reg_away ?? null,
       pen_home: parsed.data.pen_home,
       pen_away: parsed.data.pen_away,
     },

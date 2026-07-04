@@ -27,7 +27,7 @@ export default async function CopaPage() {
       supabase
         .from("ko_predictions")
         .select(
-          "ko_match_id,home_score,away_score,pen_home,pen_away,normal_points,pen_points,points,computed_at",
+          "ko_match_id,home_score,away_score,reg_home,reg_away,pen_home,pen_away,normal_points,prorrog_points,pen_points,points,computed_at",
         )
         .eq("user_id", user.id),
       supabase.from("ko_payments").select("status").eq("user_id", user.id).maybeSingle(),

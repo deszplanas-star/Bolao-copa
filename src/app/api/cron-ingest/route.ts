@@ -60,7 +60,10 @@ type FdMatch = {
   homeTeam?: { tla?: string; name?: string };
   awayTeam?: { tla?: string; name?: string };
   score?: {
+    duration?: string; // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
     fullTime?: { home: number | null; away: number | null };
+    regularTime?: { home: number | null; away: number | null }; // 90 min (só quando houve prorrog.)
+    extraTime?: { home: number | null; away: number | null }; // gols SÓ da prorrogação
     penalties?: { home: number | null; away: number | null };
   };
 };
@@ -104,16 +107,21 @@ async function run(req: NextRequest) {
   }
   const { matches: apiMatches } = (await fd.json()) as { matches: FdMatch[] };
 
-  const [{ data: teams }, { data: ours }] = await Promise.all([
+  const [{ data: teams }, { data: ours }, { data: koRows }] = await Promise.all([
     db.from("teams").select("id, iso_code"),
     db
       .from("matches")
       .select("id, home_team_id, away_team_id, home_score, away_score, status"),
+    // Estado anterior do mata-mata: necessário pra detectar gol/início/fim
+    // (o ramo ko só espelhava o placar — não notificava). home_score/away_score
+    // são o tempo normal (pênaltis ficam em pen_*).
+    db.from("ko_matches").select("fd_id, home_score, away_score, status"),
   ]);
   const isoToId = new Map((teams ?? []).map((t) => [t.iso_code as string, t.id as string]));
   const byPair = new Map(
     (ours ?? []).map((m) => [pairKey(m.home_team_id as string, m.away_team_id as string), m]),
   );
+  const koByFd = new Map((koRows ?? []).map((k) => [k.fd_id as number, k]));
 
   let updated = 0;
   let koUpserts = 0;
@@ -125,6 +133,76 @@ async function run(req: NextRequest) {
     if (am.stage !== "GROUP_STAGE") {
       const homeTla = am.homeTeam?.tla ?? null;
       const awayTla = am.awayTeam?.tla ?? null;
+
+      const ftHome = am.score?.fullTime?.home ?? null;
+      const ftAway = am.score?.fullTime?.away ?? null;
+      // reg_home/reg_away = placar do TEMPO NORMAL (90 min). A football-data só
+      // manda regularTime quando o jogo passou dos 90; senão o fullTime já é o 90 min.
+      const regTime = am.score?.regularTime;
+      const extraTime = am.score?.extraTime;
+      // went_to_et: regularTime presente ⟺ o jogo foi à prorrogação.
+      const wentToEt = regTime?.home != null && regTime?.away != null;
+      const regHome = regTime?.home ?? ftHome;
+      const regAway = regTime?.away ?? ftAway;
+
+      // ⚠️ FOOTBALL-DATA: em jogo decidido nos pênaltis, score.fullTime JÁ VEM
+      // somado com a disputa (1×1 + pênaltis 4×3 → fullTime 5×4) — E o campo
+      // score.penalties OSCILA depois do FINISHED (Austrália×Egito 03/07 veio
+      // penalties 4×4 com fullTime 3×5; o antigo fullTime−penalties gravou
+      // home_score −1×1 e zerou os pontos de todo mundo). Fontes ESTÁVEIS:
+      //   acumulado pós-prorrogação = regularTime + extraTime
+      //   pênaltis                  = fullTime − acumulado
+      const hasPens = am.score?.duration === "PENALTY_SHOOTOUT";
+      let normalHome = ftHome;
+      let normalAway = ftAway;
+      let penHome: number | null = null;
+      let penAway: number | null = null;
+      if (hasPens) {
+        if (wentToEt) {
+          normalHome = (regTime?.home ?? 0) + (extraTime?.home ?? 0);
+          normalAway = (regTime?.away ?? 0) + (extraTime?.away ?? 0);
+        } else if (ftHome != null && ftAway != null) {
+          // sem regularTime (não deveria acontecer em disputa): modelo antigo
+          normalHome = ftHome - (am.score?.penalties?.home ?? 0);
+          normalAway = ftAway - (am.score?.penalties?.away ?? 0);
+        }
+        penHome =
+          ftHome != null && normalHome != null
+            ? ftHome - normalHome
+            : (am.score?.penalties?.home ?? null);
+        penAway =
+          ftAway != null && normalAway != null
+            ? ftAway - normalAway
+            : (am.score?.penalties?.away ?? null);
+        // Sanidade: pênalti negativo, placar negativo ou disputa "empatada" em
+        // jogo ENCERRADO = snapshot inconsistente da API. Tenta o campo
+        // penalties puro; se ainda inconsistente, PULA o jogo neste ciclo (o
+        // upsert é absoluto — melhor manter o dado anterior que gravar lixo).
+        const badPens = (h: number | null, a: number | null) =>
+          h == null || a == null || h < 0 || a < 0 || (DONE.has(am.status) && h === a);
+        if (badPens(penHome, penAway)) {
+          penHome = am.score?.penalties?.home ?? null;
+          penAway = am.score?.penalties?.away ?? null;
+        }
+        if (
+          badPens(penHome, penAway) ||
+          normalHome == null ||
+          normalAway == null ||
+          normalHome < 0 ||
+          normalAway < 0
+        ) {
+          problems.push(`ko ${am.id}: placar inconsistente na API, ciclo pulado`);
+          continue;
+        }
+      }
+
+      const koStatus = DONE.has(am.status)
+        ? "finished"
+        : LIVE.has(am.status)
+          ? "live"
+          : "scheduled";
+      const prevKo = koByFd.get(am.id); // estado anterior (pra detectar gol/início/fim)
+
       const { error } = await db.from("ko_matches").upsert(
         {
           fd_id: am.id,
@@ -134,17 +212,60 @@ async function run(req: NextRequest) {
           home_iso: homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null,
           away_iso: awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null,
           kickoff_at: am.utcDate ?? null,
-          home_score: am.score?.fullTime?.home ?? null,
-          away_score: am.score?.fullTime?.away ?? null,
-          pen_home: am.score?.penalties?.home ?? null,
-          pen_away: am.score?.penalties?.away ?? null,
-          status: DONE.has(am.status) ? "finished" : LIVE.has(am.status) ? "live" : "scheduled",
+          home_score: normalHome,
+          away_score: normalAway,
+          reg_home: regHome,
+          reg_away: regAway,
+          went_to_et: wentToEt,
+          pen_home: penHome,
+          pen_away: penAway,
+          status: koStatus,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "fd_id" },
       );
-      if (error) problems.push(`ko ${am.id}: ${error.message.slice(0, 80)}`);
-      else koUpserts++;
+      if (error) {
+        problems.push(`ko ${am.id}: ${error.message.slice(0, 80)}`);
+        continue;
+      }
+      koUpserts++;
+
+      // ---- push de gol no mata-mata (espelha a lógica da fase de grupos) ----
+      // Idempotência: jogo já finalizado NÃO dispara de novo. A football-data
+      // oscila placar/status por horas depois do FINISHED — sem essa guarda o
+      // push de "Fim de jogo/GOL" entraria em loop (mesmo gotcha da fase 1).
+      if (prevKo?.status !== "finished") {
+        const homeName = homeTla ? (TLA_TO_NAME[homeTla] ?? am.homeTeam?.name ?? "?") : "?";
+        const awayName = awayTla ? (TLA_TO_NAME[awayTla] ?? am.awayTeam?.name ?? "?") : "?";
+        if (koStatus === "finished") {
+          const penTxt = hasPens ? ` (pênaltis ${penHome} × ${penAway})` : "";
+          pushEvents.push({
+            title: "Fim de jogo! 🏁",
+            body: `${homeName} ${normalHome ?? 0} × ${normalAway ?? 0} ${awayName}${penTxt} — confira o mata-mata`,
+            tag: `ko-fim-${am.id}`,
+            url: "/copa",
+          });
+        } else if (koStatus === "live") {
+          const prevTotal = (prevKo?.home_score ?? 0) + (prevKo?.away_score ?? 0);
+          const newTotal = (normalHome ?? 0) + (normalAway ?? 0);
+          const isMatchStart = !prevKo || prevKo.status === "scheduled";
+          if (isMatchStart) {
+            pushEvents.push({
+              title: "Apita o árbitro! ⚽",
+              body: `${homeName} × ${awayName} — mata-mata começando`,
+              tag: `ko-gol-${am.id}`,
+              url: "/copa",
+            });
+          } else if (newTotal > prevTotal) {
+            pushEvents.push({
+              title: "GOL! ⚽",
+              body: `${homeName} ${normalHome} × ${normalAway} ${awayName}`,
+              tag: `ko-gol-${am.id}`,
+              url: "/copa",
+            });
+          }
+        }
+      }
       continue;
     }
 

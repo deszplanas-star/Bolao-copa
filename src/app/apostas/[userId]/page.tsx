@@ -8,6 +8,15 @@ export const dynamic = "force-dynamic";
 
 const flagUrl = (iso: string) => `https://flagcdn.com/w80/${iso}.png`;
 
+// Mesma trava da fase de grupos (apostas/actions.ts): jogo fecha 5 min antes do
+// apito, ou quando deixa de estar "scheduled". Usada aqui pra esconder de
+// TERCEIROS os palpites de jogos ainda abertos (anti-cópia).
+const CUTOFF_MS = 5 * 60 * 1000;
+function isLocked(status: string, kickoff_at: string) {
+  if (status !== "scheduled") return true;
+  return new Date(kickoff_at).getTime() - Date.now() <= CUTOFF_MS;
+}
+
 function fmtKickoff(iso: string) {
   return new Date(iso).toLocaleString("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -67,6 +76,12 @@ export default async function ApostasUserPage({
     .filter((m): m is MatchView => m !== null);
 
   const withPred = matchViews.filter((m) => m.prediction !== null);
+  // Quem está olhando. Se for o dono da página, vê os próprios palpites todos.
+  // Para terceiros, só mostramos os jogos JÁ TRAVADOS — assim ninguém copia
+  // palpite de jogo que ainda não fechou.
+  const isOwn = user.id === params.userId;
+  const visible = isOwn ? withPred : withPred.filter((m) => isLocked(m.status, m.kickoff_at));
+  const hiddenCount = withPred.length - visible.length;
   const resolved = withPred.filter((m) => m.prediction?.computed_at);
   const totalPoints = withPred.reduce((s, m) => s + (m.prediction?.points ?? 0), 0);
   const exactHits = resolved.filter((m) => m.prediction?.points === 3).length;
@@ -151,11 +166,15 @@ export default async function ApostasUserPage({
           ))}
         </div>
 
-        {withPred.length === 0 ? (
-          <p className="font-serif italic text-soft">Nenhum palpite ainda.</p>
+        {visible.length === 0 ? (
+          <p className="font-serif italic text-soft">
+            {withPred.length === 0
+              ? "Nenhum palpite ainda."
+              : "🔒 Os palpites deste apostador aparecem aqui assim que cada jogo trava (5 min antes do apito)."}
+          </p>
         ) : (
           <div className="space-y-2">
-            {withPred.map((m) => {
+            {visible.map((m) => {
               const pts = m.prediction?.points ?? 0;
               const computed = !!m.prediction?.computed_at;
               return (
@@ -193,6 +212,11 @@ export default async function ApostasUserPage({
               );
             })}
           </div>
+        )}
+        {hiddenCount > 0 && (
+          <p className="mt-4 font-serif italic text-xs text-soft">
+            🔒 {hiddenCount} palpite{hiddenCount !== 1 ? "s" : ""} de jogo{hiddenCount !== 1 ? "s" : ""} ainda aberto{hiddenCount !== 1 ? "s" : ""} fica{hiddenCount !== 1 ? "m" : ""} oculto{hiddenCount !== 1 ? "s" : ""} até travar.
+          </p>
         )}
       </main>
     </div>

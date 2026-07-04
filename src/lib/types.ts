@@ -84,20 +84,28 @@ export type KoMatch = {
   home_iso: string | null;
   away_iso: string | null;
   kickoff_at: string | null;
-  home_score: number | null;
+  home_score: number | null; // placar ACUMULADO ao fim da prorrogação (= fullTime − pênaltis)
   away_score: number | null;
+  reg_home: number | null; // placar do TEMPO NORMAL (90 min) — usado da oitava em diante
+  reg_away: number | null;
+  went_to_et: boolean; // o jogo foi à prorrogação?
   pen_home: number | null;
   pen_away: number | null;
   status: string; // scheduled | live | finished
 };
 
-// Palpite do usuário num jogo do mata-mata: 4 placares (normal + pênaltis).
+// Palpite do usuário num jogo do mata-mata.
+//  - 16avos (LAST_32): home/away (normal+prorrog combinado) + pênaltis.
+//  - oitavas+ : reg_* (tempo normal 90 min) + home/away (placar pós-prorrogação) + pênaltis.
 export type KoPredictionFields = {
   home_score: number;
   away_score: number;
+  reg_home: number | null;
+  reg_away: number | null;
   pen_home: number;
   pen_away: number;
   normal_points: number;
+  prorrog_points: number;
   pen_points: number;
   points: number;
   computed_at: string | null;

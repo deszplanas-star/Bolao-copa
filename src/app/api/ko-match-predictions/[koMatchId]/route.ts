@@ -21,7 +21,9 @@ export async function GET(
 
   const { data, error } = await db
     .from("ko_predictions")
-    .select("home_score, away_score, pen_home, pen_away, points, computed_at, user_id")
+    .select(
+      "home_score, away_score, reg_home, reg_away, pen_home, pen_away, normal_points, prorrog_points, pen_points, points, computed_at, user_id",
+    )
     .eq("ko_match_id", params.koMatchId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) return NextResponse.json({ predictions: [] });
@@ -42,8 +44,13 @@ export async function GET(
       avatar_url: userMap.get(p.user_id)?.avatar_url ?? null,
       home_score: p.home_score,
       away_score: p.away_score,
+      reg_home: p.reg_home,
+      reg_away: p.reg_away,
       pen_home: p.pen_home,
       pen_away: p.pen_away,
+      normal_points: p.normal_points,
+      prorrog_points: p.prorrog_points,
+      pen_points: p.pen_points,
       points: p.points,
       computed: !!p.computed_at,
     }))

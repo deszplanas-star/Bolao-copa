@@ -121,6 +121,54 @@ async function main() {
     if (am.stage === "GROUP_STAGE") continue;
     const homeTla = am.homeTeam?.tla ?? null;
     const awayTla = am.awayTeam?.tla ?? null;
+    const ftHome = am.score?.fullTime?.home ?? null;
+    const ftAway = am.score?.fullTime?.away ?? null;
+    // reg_* = placar do tempo normal (90 min); went_to_et = foi à prorrogação.
+    // Ver cron-ingest/route.ts e migration 0009 (camada de prorrogação oitavas+).
+    const regTime = am.score?.regularTime;
+    const extraTime = am.score?.extraTime;
+    const regHome = regTime?.home ?? ftHome;
+    const regAway = regTime?.away ?? ftAway;
+    const wentToEt = regTime?.home != null && regTime?.away != null;
+    // ⚠️ FOOTBALL-DATA: em jogo de pênaltis, score.fullTime JÁ VEM somado com a
+    // disputa E score.penalties OSCILA depois do FINISHED (chegou a vir 4×4 com
+    // fullTime 3×5 — o antigo fullTime−penalties gravava placar −1). Fontes
+    // estáveis: acumulado = regularTime+extraTime; pênaltis = fullTime−acumulado.
+    // Espelha cron-ingest/route.ts.
+    const hasPens = am.score?.duration === "PENALTY_SHOOTOUT";
+    let normalHome = ftHome;
+    let normalAway = ftAway;
+    let penHome = null;
+    let penAway = null;
+    if (hasPens) {
+      if (wentToEt) {
+        normalHome = (regTime?.home ?? 0) + (extraTime?.home ?? 0);
+        normalAway = (regTime?.away ?? 0) + (extraTime?.away ?? 0);
+      } else if (ftHome != null && ftAway != null) {
+        normalHome = ftHome - (am.score?.penalties?.home ?? 0);
+        normalAway = ftAway - (am.score?.penalties?.away ?? 0);
+      }
+      penHome =
+        ftHome != null && normalHome != null ? ftHome - normalHome : (am.score?.penalties?.home ?? null);
+      penAway =
+        ftAway != null && normalAway != null ? ftAway - normalAway : (am.score?.penalties?.away ?? null);
+      const badPens = (h, a) =>
+        h == null || a == null || h < 0 || a < 0 || (DONE.has(am.status) && h === a);
+      if (badPens(penHome, penAway)) {
+        penHome = am.score?.penalties?.home ?? null;
+        penAway = am.score?.penalties?.away ?? null;
+      }
+      if (
+        badPens(penHome, penAway) ||
+        normalHome == null ||
+        normalAway == null ||
+        normalHome < 0 ||
+        normalAway < 0
+      ) {
+        problems.push(`ko ${am.id}: placar inconsistente na API, ciclo pulado`);
+        continue;
+      }
+    }
     const row = {
       fd_id: am.id,
       stage: am.stage,
@@ -129,10 +177,13 @@ async function main() {
       home_iso: homeTla ? (TLA_TO_ISO[homeTla] ?? null) : null,
       away_iso: awayTla ? (TLA_TO_ISO[awayTla] ?? null) : null,
       kickoff_at: am.utcDate ?? null,
-      home_score: am.score?.fullTime?.home ?? null,
-      away_score: am.score?.fullTime?.away ?? null,
-      pen_home: am.score?.penalties?.home ?? null,
-      pen_away: am.score?.penalties?.away ?? null,
+      home_score: normalHome,
+      away_score: normalAway,
+      reg_home: regHome,
+      reg_away: regAway,
+      went_to_et: wentToEt,
+      pen_home: penHome,
+      pen_away: penAway,
       status: DONE.has(am.status) ? "finished" : LIVE.has(am.status) ? "live" : "scheduled",
       updated_at: new Date().toISOString(),
     };
